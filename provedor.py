@@ -21,6 +21,7 @@ espera encontrar aqui.
 """
 
 import os
+import sys
 
 # `dotenv` é uma biblioteca externa (instalada via requirements.txt) que sabe
 # ler um arquivo chamado `.env` e colocar cada linha dele como se fosse uma
@@ -209,10 +210,34 @@ def rodar(agente_fabrica, mensagem):
             # aconteceu rodando OpenAI ou já rodando Ollama, não há para
             # onde recuar — `raise` relança o MESMO erro, sem escondê-lo.
             raise
-        print(f"{RED}[FALHA - zen]{RESET} {exc}")
-        print(f"{YELLOW}[RECUO]{RESET} Alternando para Ollama local e tentando novamente...")
+        # `file=sys.stderr` (não stdout): alguns scripts que chamam `rodar()`
+        # são eles mesmos servidores MCP via stdio (Aula 5), e stdout é o
+        # canal do protocolo JSON-RPC — imprimir aqui sem isso corromperia
+        # a comunicação com o cliente MCP.
+        print(f"{RED}[FALHA - zen]{RESET} {exc}", file=sys.stderr)
+        print(f"{YELLOW}[RECUO]{RESET} Alternando para Ollama local e tentando novamente...", file=sys.stderr)
         cair_para_ollama()
         # Repete a mesma lógica do "caminho feliz", mas agora com o Ollama
         # já ativo — por isso `agente_fabrica()` é chamada de novo aqui:
         # ela vai embutir `model=modelo()` já apontando para o Ollama.
         return Runner.run_sync(agente_fabrica(), mensagem)
+
+
+async def rodar_async(agente_fabrica, mensagem, **kwargs):
+    """Igual a `rodar()`, mas para agentes assíncronos (`await Runner.run(...)`).
+
+    Necessária para os agentes da Aula 5 que usam MCP Servers: conectar a um
+    MCP Server (`async with MCPServerStdio(...)`) só funciona dentro de uma
+    função `async`, e por isso a execução do agente também precisa ser
+    assíncrona. `**kwargs` repassa argumentos extras do `Runner.run`, como
+    `max_turns=25`.
+    """
+    try:
+        return await Runner.run(agente_fabrica(), mensagem, **kwargs)
+    except Exception as exc:
+        if ATIVO != "zen":
+            raise
+        print(f"{RED}[FALHA - zen]{RESET} {exc}", file=sys.stderr)
+        print(f"{YELLOW}[RECUO]{RESET} Alternando para Ollama local e tentando novamente...", file=sys.stderr)
+        cair_para_ollama()
+        return await Runner.run(agente_fabrica(), mensagem, **kwargs)
