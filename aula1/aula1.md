@@ -1,4 +1,3 @@
-
 # Aula 1: Fundamentos de Sistemas Multiagentes — Da Infraestrutura aos Agentes com Ferramentas
 
 Esta aula consolida os conceitos teóricos e a engenharia de software por trás do ciclo inicial da disciplina. O objetivo é compreender o que transforma um modelo de linguagem em um agente autônomo, como desacoplar provedores de inferência e como evoluir da simples geração textual para a execução determinística de ferramentas externas (*Tool Calling*).
@@ -13,18 +12,18 @@ Esta aula consolida os conceitos teóricos e a engenharia de software por trás 
 
 A disciplina **Sistemas Multiagentes com IA** (MBA em BI & Data Science — Ibmec, ministrada por Francisco Molina Jr.) tem 10 encontros remotos síncronos de 5h, com ênfase em **segurança pública**, formato de ~70% laboratório hands-on em Python, e avaliação pelo **projeto integrador** (um sistema multiagente fim a fim para um cenário de segurança pública, apresentado na Aula 10):
 
-| Aula | Tema |
-|---|---|
+| Aula        | Tema                                                                                                         |
+| ----------- | ------------------------------------------------------------------------------------------------------------ |
 | **1** | **Fundamentos de agentes** — ambiente, estado, memória, autonomia; agente × chatbot *(esta aula)* |
-| 2 | Comunicação agente-a-agente (A2A) — Request/Response, Pub/Sub, MQTT, gRPC, FIPA-ACL |
-| 3 | Model Context Protocol (MCP) e integração — tool calling, APIs, bancos, controle de acesso |
-| 4 | Engenharia de agent loops — ReAct, critérios de parada, retries, autonomia |
-| 5 | Padrões de orquestração — Supervisor, Broker, Blackboard, Pipeline, Debate |
-| 6 | Sistemas baseados em grafos — DAGs, estados compartilhados, LangGraph |
-| 7 | Agentes especializados e Human-in-the-Loop — papéis (Investigador, Jurídico, Analista), breakpoints |
-| 8 | Arquitetura distribuída e deploy — Docker, Kubernetes |
-| 9 | Auto-scaling, observabilidade e segurança — tracing, prompt injection, excessive agency, guardrails |
-| 10 | Projeto integrador — sistema multiagente fim a fim para um cenário de segurança pública |
+| 2           | Comunicação agente-a-agente (A2A) — Request/Response, Pub/Sub, MQTT, gRPC, FIPA-ACL                       |
+| 3           | Model Context Protocol (MCP) e integração — tool calling, APIs, bancos, controle de acesso                |
+| 4           | Engenharia de agent loops — ReAct, critérios de parada, retries, autonomia                                 |
+| 5           | Padrões de orquestração — Supervisor, Broker, Blackboard, Pipeline, Debate                               |
+| 6           | Sistemas baseados em grafos — DAGs, estados compartilhados, LangGraph                                       |
+| 7           | Agentes especializados e Human-in-the-Loop — papéis (Investigador, Jurídico, Analista), breakpoints       |
+| 8           | Arquitetura distribuída e deploy — Docker, Kubernetes                                                      |
+| 9           | Auto-scaling, observabilidade e segurança — tracing, prompt injection, excessive agency, guardrails        |
+| 10          | Projeto integrador — sistema multiagente fim a fim para um cenário de segurança pública                  |
 
 > **Atenção à nomenclatura:** as "Seções 1 a 9 + Extra" usadas no restante deste documento (e na tabela abaixo) são as **9 seções internas do deck da Aula 1** (`TeoriaAula1/aula1-agentes-ia.pdf`), não as 10 aulas da ementa acima. É fácil confundir os dois números porque ambos vão de 1 a 9/10 — mas são hierarquias diferentes: a Aula 1 do curso contém, ela mesma, 9 seções de conteúdo.
 
@@ -32,18 +31,18 @@ A disciplina **Sistemas Multiagentes com IA** (MBA em BI & Data Science — Ibme
 
 Cada seção do deck da Aula 1 adiciona **uma capacidade ao mesmo "funcionário"** (o mesmo `Agent`, ganhando recursos): responder → usar ferramentas → encaminhar → saída fixa → memória → guardrails → streaming → tudo junto → limites de produção. Use esta tabela como roteiro de estudo; os detalhes teóricos e os exercícios de cada linha estão na Seção 8 deste documento.
 
-| # | Capacidade | Conceito-chave | Exercícios do professor | Status | Detalhe |
-|---|---|---|---|---|---|
-| 1 | Responder | `Agent` + `Runner.run_sync` + `.final_output` | 1.1, 1.2 | ✅ `agente1.py` | [§8.1](#81-seção-1--o-primeiro-agente-) |
-| 2 | Usar ferramentas | `@function_tool`, schema via assinatura+docstring | 2.1–2.5 | ✅ Parcial (2.1–2.3 feitos; 2.4 ViaCEP e 2.5 CNPJ pendentes) | [§8.2](#82-seção-2--ferramentas-tools--parcial) |
-| 3 | Encaminhar (handoff) | `handoffs=[...]`, `transfer_to_<nome>`, `resultado.last_agent` | 3.1–3.5 | ⏳ Pendente em `aula1` (feito em `aula2`) | [§8.3](#83-seção-3--handoff-transferência-entre-agentes-) |
-| 4 | Saída em formato fixo | `output_type` com Pydantic | 4.1–4.3 | ⏳ Pendente em `aula1` (feito em `aula2`) | [§8.4](#84-seção-4--saída-estruturada-output_type-) |
-| 5 | Memória de sessão | `SQLiteSession`, `db_path` | 5.1–5.5 | ⏳ Pendente | [§8.5](#85-seção-5--sessão--memória-de-conversa-) |
-| 6 | Guardrails | `@input_guardrail`, `@output_guardrail`, tripwire | 6.1–6.3 | ⏳ Pendente | [§8.6](#86-seção-6--guardrails-travas-de-segurança-) |
-| 7 | Streaming | `Runner.run_streamed`, `stream_events()` | 7.1–7.3 | ⏳ Pendente | [§8.7](#87-seção-7--streaming-resposta-em-tempo-real-) |
-| 8 | Integrador | tools + handoff + output_type + sessão juntos | — | ⏳ Pendente | [§8.8](#88-seção-8--integrador-tudo-junto-) |
-| 9 | Limites e produção | `max_turns`, prompt injection indireta, aprovação humana | — (conceitual) | ⏳ Pendente | [§8.9](#89-seção-9--limites-segurança-e-produção-) |
-| Extra | API (FastAPI) | `POST /perguntar` chamando `Runner.run_sync` | Desafios 1–2 | ✅ Feito em `aula2` | [§8.10](#810-extra--expor-um-agente-como-api-fastapi--em-aula2) |
+| #     | Capacidade             | Conceito-chave                                                       | Exercícios do professor | Status                                                                                                       | Detalhe                                                         |
+| ----- | ---------------------- | -------------------------------------------------------------------- | ------------------------ | ------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------- |
+| 1     | Responder              | `Agent` + `Runner.run_sync` + `.final_output`                  | 1.1, 1.2                 | ✅`agente1.py`                                                                                             | [§8.1](#81-seção-1--o-primeiro-agente-)                       |
+| 2     | Usar ferramentas       | `@function_tool`, schema via assinatura+docstring                  | 2.1–2.5                 | ✅ Completo (`agente2.py` a `agente6.py`)                                                                | [§8.2](#82-seção-2--ferramentas-tools--completo)              |
+| 3     | Encaminhar (handoff)   | `handoffs=[...]`, `transfer_to_<nome>`, `resultado.last_agent` | 3.1–3.5                 | ✅ Feito em`aula2` (`agente_handoff*.py`, `agente_central_atendimento.py`, `agente_investigacao.py`) | [§8.3](#83-seção-3--handoff-transferência-entre-agentes-)    |
+| 4     | Saída em formato fixo | `output_type` com Pydantic                                         | 4.1–4.3                 | ✅ Feito em`aula2` (`agente_output.py`, `agente_bo.py`, `agente_triagem.py`)                         | [§8.4](#84-seção-4--saída-estruturada-output_type-)          |
+| 5     | Memória de sessão    | `SQLiteSession`, `db_path`                                       | 5.1–5.5                 | ✅ Feito em`aula2` (`agente_session.py`, `agente_sessao2.py`, etc.)                                    | [§8.5](#85-seção-5--sessão--memória-de-conversa-)           |
+| 6     | Guardrails             | `@input_guardrail`, `@output_guardrail`, tripwire                | 6.1–6.3                 | ✅ Feito em`aula2` (`agente_guardrail_puro.py`, `agente_guardrail.py`, etc.)                           | [§8.6](#86-seção-6--guardrails-travas-de-segurança-)         |
+| 7     | Streaming              | `Runner.run_streamed`, `stream_events()`                         | 7.1–7.3                 | ✅ Feito em`aula2` (`agente_streaming.py`)                                                               | [§8.7](#87-seção-7--streaming-resposta-em-tempo-real-)        |
+| 8     | Integrador             | tools + handoff + output_type + sessão juntos                       | —                       | ✅ Feito em`aula2` (`agente_integrador.py`)                                                              | [§8.8](#88-seção-8--integrador-tudo-junto-)                   |
+| 9     | Limites e produção   | `max_turns`, prompt injection indireta, aprovação humana         | — (conceitual)          | ✅ Feito em`aula2` (`agente_producao.py`)                                                                | [§8.9](#89-seção-9--limites-segurança-e-produção-)         |
+| Extra | API (FastAPI)          | `POST /perguntar` chamando `Runner.run_sync`                     | Desafios 1–2            | ✅ Feito em`aula2` (`main.py`)                                                                           | [§8.10](#810-extra--expor-um-agente-como-api-fastapi--em-aula2) |
 
 **Como usar este roadmap:** siga a ordem 1→9; cada capacidade pressupõe a anterior (ex.: o Integrador da seção 8 só faz sentido depois de ter tools, handoff, output_type e sessão isolados). O ✅/⏳ mostra o que já roda neste repositório — o Roteiro Recomendado (Seção 9 deste documento) detalha a ordem sugerida para fechar o que falta.
 
@@ -61,13 +60,13 @@ Um Modelo de Linguagem de Grande Porte (LLM) isolado é uma função matemática
 
 Um **Agente de IA** é um sistema computacional que utiliza o LLM como núcleo decisório, orquestrado por um runtime que gerencia contexto, ferramentas e objetivos: *(a Fase 0, `agente1_gemini.py`, materializa a diferença na prática — o LLM "puro" com memória manual)*
 
-| Dimensão | LLM Convencional (ex: `chat.completions`) | Agente de IA (ex: `Agent` + `Runner`) |
-|---|---|---|
-| **Comportamento** | Passivo e reativo a cada chamada. | Orientado a objetivos (*goal-oriented*) e sequencial. |
-| **Memória** | Inexistente (requer envio manual de todo o histórico a cada chamada). | Gerenciada pelo ciclo de vida do framework (*conversation state*). |
-| **Identidade** | Neutra até receber um `system prompt`. | Persona formal com restrições e diretrizes (`instructions`). |
-| **Ação no Mundo** | Limitada à emissão de texto/código. | Executa funções Python, consulta APIs e interage com o ambiente. |
-| **Orquestração** | Tratamento manual de respostas HTTP e exceções. | Runtime de controle (`Runner`) que gerencia turnos e execução de chamadas. |
+| Dimensão                 | LLM Convencional (ex:`chat.completions`)                             | Agente de IA (ex:`Agent` + `Runner`)                                       |
+| ------------------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| **Comportamento**   | Passivo e reativo a cada chamada.                                      | Orientado a objetivos (*goal-oriented*) e sequencial.                        |
+| **Memória**        | Inexistente (requer envio manual de todo o histórico a cada chamada). | Gerenciada pelo ciclo de vida do framework (*conversation state*).           |
+| **Identidade**      | Neutra até receber um`system prompt`.                               | Persona formal com restrições e diretrizes (`instructions`).               |
+| **Ação no Mundo** | Limitada à emissão de texto/código.                                 | Executa funções Python, consulta APIs e interage com o ambiente.             |
+| **Orquestração**  | Tratamento manual de respostas HTTP e exceções.                      | Runtime de controle (`Runner`) que gerencia turnos e execução de chamadas. |
 
 ---
 
@@ -525,6 +524,24 @@ if __name__ == "__main__":
 
 ---
 
+### Fase 5: Retorno Estruturado e Tratamento de Erro de API (`agente5.py`)
+
+No exercício 2.4, o agente conecta-se à API pública do **ViaCEP** (`https://viacep.com.br/ws/{cep}/json/`) para localizar logradouros, bairros e cidades brasileiras a partir do CEP.
+
+* **Tratamento da Pegadinha da ViaCEP:** Quando um CEP não existe, a API ViaCEP não devolve erro HTTP (o status continua sendo `200 OK`), mas entrega o corpo JSON `{"erro": "true"}` (ou `{"erro": true}`). A ferramenta inspeciona esse campo e levanta `ValueError(f"CEP não encontrado: {cep}")`, permitindo que o SDK entregue a mensagem ao LLM para que ele oriente o usuário com elegância.
+* **Formatação em Texto Estruturado:** A ferramenta devolve os dados essenciais de endereço estruturados em texto, e o modelo de linguagem compõe a resposta final em tom natural. *(arquivo: `agente5.py`)*
+
+---
+
+### Fase 6: Consulta Cadastral de Pessoas Jurídicas e Minimização de Dados LGPD (`agente6.py`)
+
+No exercício 2.5, o agente conecta-se à **BrasilAPI** (`https://brasilapi.com.br/api/cnpj/v1/{cnpj}`) para consultar dados cadastrais de empresas na base da Receita Federal.
+
+* **Minimização na Origem (LGPD):** O exercício conecta a engenharia de agentes aos princípios de proteção de dados. No Quadro de Sócios e Administradores (QSA), os CPFs dos sócios já são mascarados diretamente pela BrasilAPI (ex.: `***123456**`). A aplicação opera em conformidade por padrão, pois a privacidade é garantida na origem da coleta.
+* **Inteligência Cadastral:** Consolida razão social, situação cadastral, atividade econômica principal (CNAE), endereço e lista de administradores num formato pronto para uso investigativo ou operacional. *(arquivo: `agente6.py`)*
+
+---
+
 ## 4. Post-Mortem de Engenharia: Falhas e Diagnósticos
 
 Durante o desenvolvimento do laboratório, foram identificados e mitigados os seguintes pontos de falha:
@@ -585,18 +602,18 @@ A disciplina tem ênfase declarada em **segurança pública** (o professor usa c
 
 O deck `aula1/TeoriaAula1` organiza o curso em **9 seções + extra**, cada uma somando uma capacidade ao mesmo "funcionário". A tabela abaixo cruza cada seção com o que **já está implementado** e o que **ainda falta**.
 
-| # | Capacidade (deck) | Arquivo(s) | Status |
-|---|---|---|---|
-| 1 | Responder — primeiro agente | `agente1.py` | ✅ Implementado |
-| 2 | Usar ferramentas (tools) | `agente2.py`, `agente3.py`, `agente4.py` | ✅ Parcial (Open-Meteo + Frankfurter; faltam ViaCEP/CNPJ) |
-| 3 | Encaminhar (handoff) | — | ⏳ Pendente em `aula1` (feito em `aula2`) |
-| 4 | Saída em formato fixo (`output_type`) | — | ⏳ Pendente em `aula1` (feito em `aula2`) |
-| 5 | Memória de sessão (`SQLiteSession`) | — | ⏳ Pendente |
-| 6 | Guardrails (travas de segurança) | — | ⏳ Pendente |
-| 7 | Streaming (resposta em tempo real) | — | ⏳ Pendente |
-| 8 | Integrador (tudo junto) | — | ⏳ Pendente |
-| 9 | Limites, segurança e produção | — | ⏳ Pendente |
-| Extra | Expor como API (FastAPI) | `main.py` (`aula2`) | ✅ Feito em `aula2` |
+| #     | Capacidade (deck)                        | Arquivo(s)                                                                                         | Status                                                       |
+| ----- | ---------------------------------------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| 1     | Responder — primeiro agente             | `agente1.py`                                                                                     | ✅ Implementado                                              |
+| 2     | Usar ferramentas (tools)                 | `agente2.py`–`agente6.py`                                                                     | ✅ Implementado (Open-Meteo, Frankfurter, ViaCEP, CNPJ/LGPD) |
+| 3     | Encaminhar (handoff)                     | `aula2/` (`agente_handoff*.py`, `agente_central_atendimento.py`, `agente_investigacao.py`) | ✅ Feito em`aula2`                                         |
+| 4     | Saída em formato fixo (`output_type`) | `aula2/` (`agente_output.py`, `agente_bo.py`, `agente_triagem.py`)                         | ✅ Feito em`aula2`                                         |
+| 5     | Memória de sessão (`SQLiteSession`)  | `aula2/` (`agente_session.py`, `agente_sessao2.py`, etc.)                                    | ✅ Feito em`aula2`                                         |
+| 6     | Guardrails (travas de segurança)        | `aula2/` (`agente_guardrail_puro.py`, `agente_guardrail.py`, etc.)                           | ✅ Feito em`aula2`                                         |
+| 7     | Streaming (resposta em tempo real)       | `aula2/` (`agente_streaming.py`)                                                               | ✅ Feito em`aula2`                                         |
+| 8     | Integrador (tudo junto)                  | `aula2/` (`agente_integrador.py`)                                                              | ✅ Feito em`aula2`                                         |
+| 9     | Limites, segurança e produção         | `aula2/` (`agente_producao.py`)                                                                | ✅ Feito em`aula2`                                         |
+| Extra | Expor como API (FastAPI)                 | `aula2/main.py`                                                                                  | ✅ Feito em`aula2`                                         |
 
 **Convenção adotada neste laboratório:** o professor usa `OPENAI_DEFAULT_MODEL` no `.env` e **não passa `model=` no código**. Aqui seguimos o padrão explícito `model=modelo()`, que resolve o modelo do provedor ativo (Zen/Ollama) e evita o erro de "model not found". As duas abordagens são válidas; a nossa é mais explícita e resiliente.
 
@@ -611,87 +628,93 @@ Cada seção do deck propõe exercícios. Abaixo, os exercícios ganham contexto
 **Teoria.** Um `Agent` é a definição de um funcionário: um modelo de linguagem + um conjunto de `instructions` (a "persona", que manda mais que o pedido do usuário). Sozinho ele não faz nada — quem executa é o `Runner`. `run_sync` devolve um objeto rico (`RunResult`), do qual se extrai o texto final com `.final_output`. *(arquivo: `agente1.py`)*
 
 **Exercícios:**
+
 - **1.1 Primeiro agente:** `Agent(name=..., instructions=...)` + `Runner.run_sync(...)`. Imprimir `resultado` (objeto inteiro) e `resultado.final_output` (só texto). ✅ `agente1.py`
 - **1.2 Dois hábitos:** (1) usar `resultado.final_output`; (2) encapsular a execução em `main()`. ✅ `agente1.py`
 - **1.1 Ollama:** o mesmo agente 100% local — muda apenas `PROVEDOR=ollama` no `.env` e o `model`. ✅ (via `provedor.py` + `modelo()`)
 
-### 8.2 Seção 2 — Ferramentas (Tools) ✅ (parcial)
+### 8.2 Seção 2 — Ferramentas (Tools) ✅
 
-**Teoria.** `@function_tool` transforma uma função Python comum em ferramenta: o schema (JSON Schema/OpenAPI) é gerado a partir da **assinatura** e da **docstring**. Por isso a docstring não é enfeite — o modelo a lê para decidir *quando* e *como* usar a ferramenta. Durante a execução, o próprio modelo decide chamá-la. *(arquivos: `agente2.py`, `agente3.py`, `agente4.py`)*
+**Teoria.** `@function_tool` transforma uma função Python comum em ferramenta: o schema (JSON Schema/OpenAPI) é gerado a partir da **assinatura** e da **docstring**. Por isso a docstring não é enfeite — o modelo a lê para decidir *quando* e *como* usar a ferramenta. Durante a execução, o próprio modelo decide chamá-la. *(arquivos: `agente2.py` a `agente6.py`)*
 
 **Exercícios:**
+
 - **2.1 Primeira ferramenta:** `@function_tool` + `tools=[...]` no agente. ✅
 - **2.2 API real (Open-Meteo):** geocodificação (nome → coordenadas) + forecast (coordenadas → temperatura). Se a cidade não existir, `raise ValueError(...)` — o SDK entrega o erro ao modelo. ✅ `agente2.py`
 - **2.3 Câmbio (2 argumentos):** a ferramenta recebe `moeda_origem` e `moeda_destino`; o modelo extrai os dois da frase ("dólar em reais" → USD, BRL). ✅ `agente4.py` (e `agente3.py`)
-- **2.4 CEP (ViaCEP) — ⏳ pendente:** consulta `https://viacep.com.br/ws/{cep}/json/`, limpa o CEP (com/sem hífen). **Pegadinha:** CEP inexistente não dá erro HTTP — vem `{"erro": "true"}`. Retorne logradouro, bairro, cidade e UF em texto; o modelo reescreve de forma natural.
-- **2.5 CNPJ (BrasilAPI) + LGPD — ⏳ pendente:** consulta `https://brasilapi.com.br/api/cnpj/v1/{cnpj}`. Retorne razão social, situação cadastral, atividade, endereço e o quadro de sócios (`qsa`). **Ponto LGPD:** os CPFs dos sócios já vêm mascarados pela fonte — a minimização acontece na origem.
+- **2.4 CEP (ViaCEP):** consulta `https://viacep.com.br/ws/{cep}/json/`, limpa o CEP (com/sem hífen). **Pegadinha:** CEP inexistente não dá erro HTTP — vem `{"erro": "true"}`. Retorne logradouro, bairro, cidade e UF em texto; o modelo reescreve de forma natural. ✅ `agente5.py`
+- **2.5 CNPJ (BrasilAPI) + LGPD:** consulta `https://brasilapi.com.br/api/cnpj/v1/{cnpj}`. Retorne razão social, situação cadastral, atividade, endereço e o quadro de sócios (`qsa`). **Ponto LGPD:** os CPFs dos sócios já vêm mascarados pela fonte — a minimização acontece na origem. ✅ `agente6.py`
 
-### 8.3 Seção 3 — Handoff (Transferência entre Agentes) ⏳
+### 8.3 Seção 3 — Handoff (Transferência entre Agentes) ✅
 
-**Teoria.** *Handoff* é a transferência de uma conversa de um agente para outro. Por baixo dos panos, cada agente disponível vira uma ferramenta `transfer_to_<nome>` que o agente de origem pode chamar. O triador tem `handoffs=[...]` em vez de `tools=[...]`, e a decisão é só linguagem natural — nenhum `if/else` de roteamento. `resultado.last_agent` diz quem respondeu. *(arquivos em `aula2`: `agente_handoff.py`, `agente_handoff2.py`)*
-
-**Exercícios:**
-- **3.1 Triador + especialistas:** `handoffs=[especialista_a, especialista_b]`; imprimir `resultado.last_agent.name`.
-- **3.2 Observar a transferência:** usar `handoff(agente, on_handoff=callback)` para registrar um `[LOG]` no momento da transferência (auditoria). O triador responde sozinho o trivial ("Bom dia!") e só encaminha dúvidas.
-- **3.3 Central de Atendimento (handoff + tools):** dois especialistas, cada um com uma tool de API real (clima Open-Meteo, endereços ViaCEP), e um triador que só roteia.
-- **3.4 Apoio à Investigação (Nominatim):** especialista cadastral (CNPJ/BrasilAPI) + um de georreferenciamento (Nominatim, endereço → coordenadas). **Atenção:** o Nominatim exige header `User-Agent` identificando a aplicação, senão bloqueia.
-- **3.5 Custo de um 3º especialista:** adicionar telefonia (DDD via BrasilAPI) — ferramenta + agente + uma linha em `handoffs` + uma frase nas instruções. Nenhum `if/else`.
-
-> Feito parcialmente em `aula2` (`agente_handoff.py` com `handoffs` e `agente_handoff2.py` com `as_tool`).
-
-### 8.4 Seção 4 — Saída Estruturada (`output_type`) ⏳
-
-**Teoria.** `output_type` obriga o modelo a devolver dados num formato fixo, validado por um modelo Pydantic, em vez de texto livre — um contrato que o resto do sistema consome sem *parsing* frágil de string. O SDK traduz o schema Pydantic em JSON Schema; `final_output` deixa de ser `str` e passa a ser uma instância do modelo declarado. *(arquivos em `aula2`: `agente_output.py`, `agente_bo.py`)*
+**Teoria.** *Handoff* é a transferência de uma conversa de um agente para outro. Por baixo dos panos, cada agente disponível vira uma ferramenta `transfer_to_<nome>` que o agente de origem pode chamar. O triador tem `handoffs=[...]` em vez de `tools=[...]`, e a decisão é só linguagem natural — nenhum `if/else` de roteamento. `resultado.last_agent` diz quem respondeu. *(arquivos em `aula2`: `agente_handoff.py`, `agente_handoff2.py`, `agente_handoff_callback.py`, `agente_central_atendimento.py`, `agente_investigacao.py`)*
 
 **Exercícios:**
-- **4.1 `output_type` com Pydantic:** `class Evento(BaseModel): ...`; `participantes: int` volta como `int` de verdade (não `"12"`). No `Agent`, usar `output_type=Evento`.
-- **4.2 Ocorrência — modelos aninhados + lista:** gerar um `Ocorrencia` com `tipo`, `data`, `local`, `resumo` e uma `list[Envolvido]`, onde `Envolvido` é um `BaseModel` com `nome` e `papel` (vítima/suspeito/testemunha). Percorrer a lista no final. ✅ `agente_bo.py` (em `aula2`)
-- **4.3 Triagem — `Literal` + `bool`:** `categoria` e `prioridade` só aceitam valores de uma lista fechada (`Literal[...]`), mais um `bool urgente`. O SDK rejeita valores fora da lista; o `bool` volta como `bool` (dá para usar em `if t.urgente:`).
 
-> Feito parcialmente em `aula2` (`agente_bo.py` e `agente_output.py`).
+- **3.1 Triador + especialistas:** `handoffs=[especialista_a, especialista_b]`; imprimir `resultado.last_agent.name`. ✅ `agente_handoff.py`
+- **3.2 Observar a transferência:** usar `handoff(agente, on_handoff=callback)` para registrar um `[LOG]` no momento da transferência (auditoria). O triador responde sozinho o trivial ("Bom dia!") e só encaminha dúvidas. ✅ `agente_handoff_callback.py`
+- **3.3 Central de Atendimento (handoff + tools):** dois especialistas, cada um com uma tool de API real (clima Open-Meteo, endereços ViaCEP), e um triador que só roteia. ✅ `agente_central_atendimento.py`
+- **3.4 Apoio à Investigação (Nominatim):** especialista cadastral (CNPJ/BrasilAPI) + um de georreferenciamento (Nominatim, endereço → coordenadas). **Atenção:** o Nominatim exige header `User-Agent` identificando a aplicação, senão bloqueia. ✅ `agente_investigacao.py`
+- **3.5 Custo de um 3º especialista:** adicionar telefonia (DDD via BrasilAPI) — ferramenta + agente + uma linha em `handoffs` + uma frase nas instruções. Nenhum `if/else`. ✅ `agente_investigacao.py`
 
-### 8.5 Seção 5 — Sessão / Memória de Conversa ⏳
+> Feito em `aula2` (`agente_handoff.py`, `agente_handoff2.py`, `agente_handoff_callback.py`, `agente_central_atendimento.py` e `agente_investigacao.py`).
 
-**Teoria.** *Sessão* é a memória de conversa entre turnos. Sem ela, cada chamada ao `Runner` começa do zero. A `SQLiteSession` guarda o histórico sob um identificador e o reinjeta a cada novo turno. Sem `db_path`, ela é `:memory:` (mora na RAM); com `db_path=...`, persiste em arquivo. *(arquivos em `aula2`: `agente_session.py`, `agente_sessao2.py`, `agente_memoria.py`)*
+### 8.4 Seção 4 — Saída Estruturada (`output_type`) ✅
 
-**Exercícios:**
-- **5.1 `SQLiteSession` entre turnos:** `sessao = SQLiteSession("id")`; passar `session=sessao` em cada `run_sync`. "Ela" do 2º turno só funciona com o histórico.
-- **5.2 Sessão + ferramenta:** agente de clima com sessão; perguntar a temperatura de duas cidades e, no 3º turno, comparar qual está mais quente **sem repetir números** — a sessão guarda também os resultados das ferramentas.
-- **5.3 Isolamento entre sessões:** duas sessões com ids distintos ("dois casos"); informar um dado na 1ª, perguntar na 2ª (não deve saber) e confirmar na 1ª (deve lembrar). O id impede vazamento de contexto — decisão de segurança, não detalhe técnico.
-- **5.4 Coleta progressiva:** o usuário fornece tipo, local e data em turnos separados e, no fim, pede o resumo consolidado — só a sessão acumula.
-- **5.5 Memória em arquivo:** `db_path=...` para a conversa sobreviver ao fim do programa. Detectar se é a 1ª execução (o `.db` ainda não existe) e rodar duas vezes para provar que o programa fechou entre elas.
-
-### 8.6 Seção 6 — Guardrails (Travas de Segurança) ⏳
-
-**Teoria.** Guardrails são travas que rodam em paralelo ao agente. Um `input_guardrail` inspeciona o pedido do usuário **antes** de gastar tokens com o agente principal; um `output_guardrail` inspeciona a resposta **antes** de ela sair. Se a trava detecta algo proibido, dispara o *tripwire* e a execução para com exceção. *(arquivos em `aula2`: `agente_guardrail.py`, `agente_output_guardrail.py`)*
+**Teoria.** `output_type` obriga o modelo a devolver dados num formato fixo, validado por um modelo Pydantic, em vez de texto livre — um contrato que o resto do sistema consome sem *parsing* frágil de string. O SDK traduz o schema Pydantic em JSON Schema; `final_output` deixa de ser `str` e passa a ser uma instância do modelo declarado. *(arquivos em `aula2`: `agente_output.py`, `agente_bo.py`, `agente_triagem.py`)*
 
 **Exercícios:**
-- **6.1 Input guardrail (Python puro):** `@input_guardrail` com uma lista de palavras proibidas; retornar `GuardrailFunctionOutput(output_info={}, tripwire_triggered=bool)`.
-- **6.2 Input guardrail com LLM (LGPD):** um agente "verificador" (com `output_type`) classifica se a mensagem pede dados pessoais sensíveis de terceiros (CPF, endereço residencial, telefone); se sim, dispara o tripwire.
-- **6.3 Output guardrail (regex, sem LLM):** `@output_guardrail` que inspeciona a resposta e dispara se ela contiver um CPF (regex Python puro). Exceção: `OutputGuardrailTripwireTriggered`.
 
-### 8.7 Seção 7 — Streaming (Resposta em Tempo Real) ⏳
+- **4.1 `output_type` com Pydantic:** `class Evento(BaseModel): ...`; `participantes: int` volta como `int` de verdade (não `"12"`). No `Agent`, usar `output_type=Evento`. ✅ `aula2/agente_output.py`
+- **4.2 Ocorrência — modelos aninhados + lista:** gerar um `Ocorrencia` com `tipo`, `data`, `local`, `resumo` e uma `list[Envolvido]`, onde `Envolvido` é um `BaseModel` com `nome` e `papel` (vítima/suspeito/testemunha). Percorrer a lista no final. ✅ `aula2/agente_bo.py`
+- **4.3 Triagem — `Literal` + `bool`:** `categoria` e `prioridade` só aceitam valores de uma lista fechada (`Literal[...]`), mais um `bool urgente`. O SDK rejeita valores fora da lista; o `bool` volta como `bool` (dá para usar em `if t.urgente:`). ✅ `aula2/agente_triagem.py`
+
+### 8.5 Seção 5 — Sessão / Memória de Conversa ✅
+
+**Teoria.** *Sessão* é a memória de conversa entre turnos. Sem ela, cada chamada ao `Runner` começa do zero. A `SQLiteSession` guarda o histórico sob um identificador e o reinjeta a cada novo turno. Sem `db_path`, ela é `:memory:` (mora na RAM); com `db_path=...`, persiste em arquivo. *(arquivos em `aula2`: `agente_session.py`, `agente_sessao2.py`, `agente_isolamento.py`, `agente_coleta.py`, `agente_memoria.py`)*
+
+**Exercícios:**
+
+- **5.1 `SQLiteSession` entre turnos:** `sessao = SQLiteSession("id")`; passar `session=sessao` em cada `run_sync`. "Ela" do 2º turno só funciona com o histórico. ✅ `aula2/agente_session.py`
+- **5.2 Sessão + ferramenta:** agente de clima com sessão; perguntar a temperatura de duas cidades e, no 3º turno, comparar qual está mais quente **sem repetir números** — a sessão guarda também os resultados das ferramentas. ✅ `aula2/agente_sessao2.py`
+- **5.3 Isolamento entre sessões:** duas sessões com ids distintos ("dois casos"); informar um dado na 1ª, perguntar na 2ª (não deve saber) e confirmar na 1ª (deve lembrar). O id impede vazamento de contexto — decisão de segurança, não detalhe técnico. ✅ `aula2/agente_isolamento.py`
+- **5.4 Coleta progressiva:** o usuário fornece tipo, local e data em turnos separados e, no fim, pede o resumo consolidado — só a sessão acumula. ✅ `aula2/agente_coleta.py`
+- **5.5 Memória em arquivo:** `db_path=...` para a conversa sobreviver ao fim do programa. Detectar se é a 1ª execução (o `.db` ainda não existe) e rodar duas vezes para provar que o programa fechou entre elas. ✅ `aula2/agente_memoria.py`
+
+### 8.6 Seção 6 — Guardrails (Travas de Segurança) ✅
+
+**Teoria.** Guardrails são travas que rodam em paralelo ao agente. Um `input_guardrail` inspeciona o pedido do usuário **antes** de gastar tokens com o agente principal; um `output_guardrail` inspeciona a resposta **antes** de ela sair. Se a trava detecta algo proibido, dispara o *tripwire* e a execução para com exceção. *(arquivos em `aula2`: `agente_guardrail_puro.py`, `agente_guardrail.py`, `agente_output_guardrail.py`)*
+
+**Exercícios:**
+
+- **6.1 Input guardrail (Python puro):** `@input_guardrail` com uma lista de palavras proibidas; retornar `GuardrailFunctionOutput(output_info={}, tripwire_triggered=bool)`. Dispara `InputGuardrailTripwireTriggered` sem chamar o LLM. ✅ `aula2/agente_guardrail_puro.py`
+- **6.2 Input guardrail com LLM (LGPD):** um agente "verificador" (com `output_type`) classifica se a mensagem pede dados pessoais sensíveis de terceiros (CPF, endereço residencial, telefone); se sim, dispara o tripwire. ✅ `aula2/agente_guardrail.py`
+- **6.3 Output guardrail (regex, sem LLM):** `@output_guardrail` que inspeciona a resposta e dispara se ela contiver um CPF (regex Python puro). Exceção: `OutputGuardrailTripwireTriggered`. ✅ `aula2/agente_output_guardrail.py`
+
+### 8.7 Seção 7 — Streaming (Resposta em Tempo Real) ✅
 
 **Teoria.** Streaming é receber a resposta do agente em pedaços (eventos), à medida que o modelo gera cada token, em vez de esperar a resposta inteira pronta. `Runner.run_streamed` devolve um iterador assíncrono de eventos; `stream_events()` é um gerador assíncrono (`async for`). *(arquivo em `aula2`: `agente_streaming.py`)*
 
 **Exercícios:**
-- **7.1 Tokens um a um:** `run_streamed` (sem `await`) + `stream_events()`; filtrar `event.type == "raw_response_event"` e `isinstance(event.data, ResponseTextDeltaEvent)`, imprimindo `event.data.delta`.
-- **7.2 Streaming + ferramenta (ciclo de vida):** tratar `run_item_stream_event` para imprimir quando a tool é chamada (`name == "tool_called"`) e quando o resultado chega (`name == "tool_output"`, em `event.item.output`). Ordem: ferramenta acionada → dado voltando → resposta digitada.
-- **7.3 Streaming + handoff:** tratar `agent_updated_stream_event` e imprimir `event.new_agent.name` quando o agente ativo mudar — torna visível o instante exato do handoff.
 
-### 8.8 Seção 8 — Integrador (Tudo Junto) ⏳
+- **7.1 Tokens um a um:** `run_streamed` (sem `await`) + `stream_events()`; filtrar `event.type == "raw_response_event"` e `isinstance(event.data, ResponseTextDeltaEvent)`, imprimindo `event.data.delta`. ✅ `aula2/agente_streaming.py`
+- **7.2 Streaming + ferramenta (ciclo de vida):** tratar `run_item_stream_event` para imprimir quando a tool é chamada (`name == "tool_called"`) e quando o resultado chega (`name == "tool_output"`, em `event.item.output`). Ordem: ferramenta acionada → dado voltando → resposta digitada. ✅ `aula2/agente_streaming.py`
+- **7.3 Streaming + handoff:** tratar `agent_updated_stream_event` e imprimir `event.new_agent.name` quando o agente ativo mudar — torna visível o instante exato do handoff. ✅ `aula2/agente_streaming.py`
+
+### 8.8 Seção 8 — Integrador (Tudo Junto) ✅
 
 **Teoria.** Não é uma capacidade nova do SDK, e sim a combinação das anteriores num único agente: **tools + handoff + saída estruturada + memória de sessão** — o atendimento completo. A observação do professor: quando um `guardrail` é `async` e usa `await Runner.run(...)`, o `run_sync` quebra — é preciso usar a versão assíncrona. *(arquivo em `aula2`: `agente_integrador.py`)*
 
-**Exercício:** montar um agente com `tools=[...]`, `input_guardrails=[...]`, `output_type=...` e uma `SQLiteSession`, e exercitar: turno 1 → ferramenta; turno 2 → memória; turno 3 → guardrail barra.
+**Exercício:** montar um agente com `tools=[...]`, `input_guardrails=[...]`, `output_type=...` e uma `SQLiteSession`, e exercitar: turno 1 → ferramenta; turno 2 → memória; turno 3 → guardrail barra. ✅ `aula2/agente_integrador.py`
 
-### 8.9 Seção 9 — Limites, Segurança e Produção ⏳
+### 8.9 Seção 9 — Limites, Segurança e Produção ✅
 
-**Teoria.** Não é sobre uma classe do SDK, e sim sobre o que separa um protótipo de aula de um sistema em produção: tracing/observabilidade, custo e limites de uso, tratamento de erro, e onde os guardrails realmente importam quando o dado é sensível (LGPD). *(arquivo em `aula2`: `agente_producao.py`)*
+**Teoria.** Trata do que separa um protótipo de aula de um sistema em produção: tracing/observabilidade, custo e limites de uso, tratamento de erro, e onde os guardrails realmente importam quando o dado é sensível (LGPD). *(arquivo em `aula2`: `agente_producao.py`)*
 
 **Conceitos-chave:**
-- **O loop do agente e `max_turns`:** um turno = o modelo decide responder OU chamar ferramenta → se chamou, o `Runner` executa e devolve → decide de novo. `Runner.run(..., max_turns=N)`, padrão 10; estourou → `MaxTurnsExceeded`.
-- **Prompt injection indireta (conteúdo das ferramentas):** a Seção 6 protege contra o que o cidadão digita; o ataque também vem de dentro — uma ferramenta lê um PDF/e-mail/página com "IGNORE suas instruções...". Para o modelo, dado e instrução chegam do mesmo jeito: como texto.
+
+- **O loop do agente e `max_turns`:** um turno = o modelo decide responder OU chamar ferramenta → se chamou, o `Runner` executa e devolve → decide de novo. `Runner.run(..., max_turns=N)`, padrão 10; estourou → `MaxTurnsExceeded`. ✅ `aula2/agente_producao.py`
+- **Prompt injection indireta (conteúdo das ferramentas):** a Seção 6 protege contra o que o cidadão digita; o ataque também vem de dentro — uma ferramenta lê um PDF/e-mail/página com "IGNORE suas instruções...". Para o modelo, dado e instrução chegam do mesmo jeito: como texto. ✅ `aula2/agente_producao.py`
 - **Quando NÃO usar um agente:** consulta determinística (validar CPF, buscar CEP, somar) → código comum: mais rápido, de graça, testável, sempre igual. Agente só quando é preciso entender linguagem ambígua ou decidir rota sem regra fixa.
 - **Ação consequente exige aprovação humana:** quando uma ferramenta *escreve* (registra ocorrência, dispara ofício, altera cadastro), o padrão é: a ferramenta propõe → um humano aprova → só então roda.
 
@@ -702,20 +725,48 @@ Cada seção do deck propõe exercícios. Abaixo, os exercícios ganham contexto
 **Estrutura:** `provedor.py` (configuração) + `agente.py` (Agent + tool + `executar_agente(mensagem)`) + `main.py` (FastAPI com `POST /perguntar`).
 
 **Exercícios:**
+
 - **Desafio 1:** acrescentar `consultar_cotacao(moeda)` ao agente e testar: só clima, só cotação, os dois juntos, nenhum dos dois.
 - **Desafio 2:** criar `POST /clima` chamando `consultar_clima()` direto e comparar com `POST /perguntar` — a mesma pergunta, duas arquiteturas.
 - **Próximo passo:** a mesma API cresce para RAG ou rotear entre agentes especialistas (Supervisor + Agente A/B/C) sem mudar o contrato HTTP.
 
 ---
 
-## 9. Roteiro Recomendado para Conclusão
+## 9. Roteiro de Execução dos Exemplos
 
-Para alinhar o laboratório ao deck completo, a ordem sugerida das seções pendentes:
+Com 100% dos exercícios e capacidades implementados, todos os scripts podem ser executados a partir da raiz do repositório:
 
-1. **Seção 2 — completar:** ViaCEP (2.4) e BrasilAPI/CNPJ (2.5) — reforçam o padrão de tools + tratamento de "erro" sem HTTP error.
-2. **Seção 3 — handoff:** triador + especialistas, com callback de auditoria e o caso da investigação (Nominatim/DDD).
-3. **Seção 4 — saída estruturada:** `Literal` + `bool` (Triagem) — complementa os modelos aninhados já feitos em `aula2`.
-4. **Seção 5 — sessão:** memória entre turnos, isolamento por id e persistência em arquivo.
-5. **Seções 6–7 — guardrails e streaming:** travas de LGPD (entrada/saída) e o ciclo de vida ao vivo.
-6. **Seção 8 — integrador:** combinar tudo num único agente.
-7. **Seção 9 — produção:** `max_turns`, defesa contra prompt injection indireta e o princípio de aprovação humana.
+### Exemplos da Aula 1 (Fundamentos e Ferramentas)
+
+```bash
+python -m aula1.agente1        # 1.1 e 1.2: Primeiro agente e boas práticas
+python -m aula1.agente2        # 2.1 e 2.2: Ferramenta com API real (Open-Meteo)
+python -m aula1.agente3        # 2.3: Câmbio + Prompt Defensivo contra Leakage
+python -m aula1.agente4        # 2.3: Tool calling determinístico (tool_choice="required")
+python -m aula1.agente5        # 2.4: Consulta de CEP com ViaCEP e retorno estruturado
+python -m aula1.agente6        # 2.5: Consulta cadastral de CNPJ na BrasilAPI + LGPD
+```
+
+### Exemplos da Aula 2 (Orquestração, Memória, Guardrails e Produção)
+
+```bash
+python -m aula2.agente_handoff            # 3.1: Handoff matemático/historiador
+python -m aula2.agente_handoff_callback   # 3.2: Handoff com callback de auditoria
+python -m aula2.agente_central_atendimento # 3.3: Central de atendimento (clima + endereços)
+python -m aula2.agente_investigacao       # 3.4 e 3.5: Apoio à investigação (Nominatim, CNPJ, DDD)
+python -m aula2.agente_output             # 4.1: Saída estruturada Pydantic plana
+python -m aula2.agente_bo                 # 4.2: Boletim de Ocorrência estruturado aninhado
+python -m aula2.agente_triagem            # 4.3: Triagem com Literal + bool
+python -m aula2.agente_session            # 5.1: Memória entre turnos
+python -m aula2.agente_sessao2            # 5.2: Memória + ferramentas de clima
+python -m aula2.agente_isolamento         # 5.3: Isolamento entre sessões/casos
+python -m aula2.agente_coleta             # 5.4: Coleta progressiva
+python -m aula2.agente_memoria            # 5.5: Persistência de memória em arquivo SQLite
+python -m aula2.agente_guardrail_puro     # 6.1: Input guardrail determinístico em Python puro
+python -m aula2.agente_guardrail          # 6.2: Input guardrail com LLM (LGPD)
+python -m aula2.agente_output_guardrail   # 6.3: Output guardrail com regex de CPF
+python -m aula2.agente_streaming          # 7.1 a 7.3: Streaming de tokens, ciclo de vida e handoff
+python -m aula2.agente_integrador         # 8.1: Integrador completo assíncrono
+python -m aula2.agente_producao           # 9.1 e 9.2: Max turns e prompt injection indireta
+uvicorn aula2.main:app --reload           # Extra: API FastAPI expondo os agentes
+```

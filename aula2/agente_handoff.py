@@ -59,3 +59,23 @@ def executar_agente_handoff(mensagem: str) -> str:
     # nesta função, mas é o que a Seção 3 do deck destaca como o jeito de auditar
     # o roteiro sem escrever nenhum if/else).
     return resultado.final_output
+
+
+if __name__ == "__main__":
+    # Aceita a mensagem como argumentos de linha de comando ou via stdin
+    if len(sys.argv) > 1:
+        mensagem = " ".join(sys.argv[1:])
+    else:
+        try:
+            mensagem = input("Pergunta: ")
+        except EOFError:
+            sys.exit(0)
+
+    try:
+        resposta = executar_agente_handoff(mensagem)
+    except Exception as e:
+        # Mostrar erro para diagnóstico rápido
+        print(f"Erro ao executar agente_handoff: {e}")
+        raise
+
+    print(resposta)

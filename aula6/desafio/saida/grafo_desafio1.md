@@ -1,0 +1,42 @@
+# grafo_desafio1
+
+```mermaid
+---
+config:
+  flowchart:
+    curve: linear
+---
+graph TD;
+	__start__([<p>__start__</p>]):::first
+	receber(receber)
+	classificar_urgencia(classificar_urgencia)
+	encaminhar(encaminhar)
+	responder(responder)
+	pesquisar(pesquisar)
+	analisar(analisar)
+	validar(validar)
+	revisar(revisar)
+	consultar_feriados(consultar_feriados)
+	calcular_prazo(calcular_prazo)
+	__end__([<p>__end__</p>]):::last
+	__start__ --> receber;
+	analisar --> validar;
+	calcular_prazo --> analisar;
+	classificar_urgencia -. &nbsp;urgente&nbsp; .-> encaminhar;
+	classificar_urgencia -. &nbsp;normal&nbsp; .-> pesquisar;
+	consultar_feriados --> calcular_prazo;
+	encaminhar --> responder;
+	pesquisar -. &nbsp;com_base&nbsp; .-> consultar_feriados;
+	pesquisar -. &nbsp;sem_base&nbsp; .-> responder;
+	receber --> classificar_urgencia;
+	revisar --> analisar;
+	validar -. &nbsp;desistir&nbsp; .-> responder;
+	validar -. &nbsp;erro&nbsp; .-> revisar;
+	responder --> __end__;
+	classDef default fill:#f2f0ff,line-height:1.2
+	classDef first fill-opacity:0
+	classDef last fill:#bfb6fc
+	classDef executado fill:#ffd166,stroke:#b8860b,stroke-width:2px,color:#000;
+	class receber,classificar_urgencia,pesquisar,consultar_feriados,calcular_prazo,analisar,validar,revisar,responder executado;
+
+```

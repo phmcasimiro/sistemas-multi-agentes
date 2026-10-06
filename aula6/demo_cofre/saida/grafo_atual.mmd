@@ -1,0 +1,22 @@
+---
+config:
+  flowchart:
+    curve: linear
+---
+graph TD;
+	__start__([<p>__start__</p>]):::first
+	receber(receber)
+	tentar(tentar)
+	liberar(liberar)
+	bloquear(bloquear)
+	__end__([<p>__end__</p>]):::last
+	__start__ --> receber;
+	receber --> tentar;
+	tentar -.-> bloquear;
+	tentar -. &nbsp;ok&nbsp; .-> liberar;
+	bloquear --> __end__;
+	liberar --> __end__;
+	tentar -. &nbsp;erro&nbsp; .-> tentar;
+	classDef default fill:#f2f0ff,line-height:1.2
+	classDef first fill-opacity:0
+	classDef last fill:#bfb6fc

@@ -59,3 +59,11 @@ amqtt                # Aula 4 — broker MQTT local opcional
 mcp                  # Aula 5 — servidor/cliente MCP (FastMCP)
 psycopg2-binary      # Aula 5 — cliente PostgreSQL (exemplos/, dados/seed_postgres.py)
 pymssql              # Aula 5 — cliente SQL Server (exemplos/, dados/seed_sqlserver.py)
+# Aula 6 / 7 (atualização do professor)
+langgraph>=1.2,<2.0
+langgraph-checkpoint-sqlite>=3.0
+python-dotenv>=1.0
+anthropic>=1.8,<2.0
+langsmith>=0.14,<1.0
+mcp>=2.0
+openai>=2.0

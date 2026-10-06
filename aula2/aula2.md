@@ -12,34 +12,34 @@ Esta aula dá o passo central da disciplina de Sistemas Multiagentes: fazer múl
 
 Cada linha é uma capacidade do deck da Aula 1, com o(s) arquivo(s) desta pasta que a implementam e o que ainda falta. Os números de exercício (3.1, 5.3, 6.2 etc.) são os mesmos usados em `aula1/aula1.md` (§8).
 
-| Seção do deck         | Capacidade                                              | Exercícios | Arquivo(s)                   | Status                                                         |
-| --------------------- | ------------------------------------------------------- | ---------- | ---------------------------- | -------------------------------------------------------------- |
-| 3 — Handoff           | Triador + especialistas (transferência de turno)        | 3.1        | `agente_handoff.py`          | ✅                                                             |
-| 3 — Handoff           | Auditoria da transferência (`on_handoff`)               | 3.2        | `agente_handoff_callback.py` | ✅                                                             |
-| 3 — Handoff           | Central de Atendimento (handoff + tools reais)          | 3.3        | —                            | ⏳ Pendente                                                    |
-| 3 — Handoff           | Apoio à Investigação (Nominatim)                        | 3.4        | —                            | ⏳ Pendente                                                    |
-| 3 — Handoff           | 3º especialista (DDD/telefonia)                         | 3.5        | —                            | ⏳ Pendente                                                    |
-| —                     | Agente como ferramenta (`as_tool`, variação do handoff) | —          | `agente_handoff2.py`         | ✅ (mecanismo alternativo, não numerado no deck)               |
-| 4 — Saída estruturada | `output_type` com Pydantic (campos simples)             | 4.1        | `agente_output.py`           | ✅                                                             |
-| 4 — Saída estruturada | Modelos aninhados + lista (`Ocorrencia`/`Envolvido`)    | 4.2        | `agente_bo.py`               | ✅                                                             |
-| 4 — Saída estruturada | `Literal` (valores fechados) + `bool`                   | 4.3        | `agente_triagem.py`          | ✅                                                             |
-| 5 — Sessão            | `SQLiteSession` entre turnos                            | 5.1        | `agente_session.py`          | ✅                                                             |
-| 5 — Sessão            | Sessão + ferramenta (comparação sem repetir API)        | 5.2        | `agente_sessao2.py`          | ✅                                                             |
-| 5 — Sessão            | Isolamento entre sessões (dois ids)                     | 5.3        | `agente_isolamento.py`       | ✅                                                             |
-| 5 — Sessão            | Coleta progressiva                                      | 5.4        | `agente_coleta.py`           | ✅                                                             |
-| 5 — Sessão            | Memória em arquivo (`db_path`) reutilizável             | 5.5        | `agente_memoria.py`          | ✅                                                             |
-| 6 — Guardrails        | Input guardrail em Python puro (lista de palavras)      | 6.1        | —                            | ⏳ Pendente (`agente_guardrail.py` já é a versão 6.2, com LLM) |
-| 6 — Guardrails        | Input guardrail com LLM (LGPD)                          | 6.2        | `agente_guardrail.py`        | ✅                                                             |
-| 6 — Guardrails        | Output guardrail (regex, sem LLM)                       | 6.3        | `agente_output_guardrail.py` | ✅                                                             |
-| 7 — Streaming         | Tokens um a um                                          | 7.1        | `agente_streaming.py`        | ✅                                                             |
-| 7 — Streaming         | Streaming + ciclo de vida da ferramenta                 | 7.2        | `agente_streaming.py`        | ✅                                                             |
-| 7 — Streaming         | Streaming + handoff (instante da transferência)         | 7.3        | `agente_streaming.py`        | ✅                                                             |
-| 8 — Integrador        | tools + guardrail + output_type + sessão num só agente  | —          | `agente_integrador.py`       | ✅                                                             |
-| 9 — Produção          | `max_turns` / `MaxTurnsExceeded`                        | 9.1        | `agente_producao.py`         | ✅                                                             |
-| 9 — Produção          | Prompt injection indireta (conteúdo de ferramenta)      | 9.2        | `agente_producao.py`         | ✅                                                             |
-| Extra                 | API FastAPI expondo os agentes                          | —          | `main.py`                    | ✅                                                             |
+| Seção do deck         | Capacidade                                              | Exercícios | Arquivo(s)                     | Status                                                         |
+| --------------------- | ------------------------------------------------------- | ---------- | ------------------------------ | -------------------------------------------------------------- |
+| 3 — Handoff           | Triador + especialistas (transferência de turno)        | 3.1        | `agente_handoff.py`            | ✅                                                             |
+| 3 — Handoff           | Auditoria da transferência (`on_handoff`)               | 3.2        | `agente_handoff_callback.py`   | ✅                                                             |
+| 3 — Handoff           | Central de Atendimento (handoff + tools reais)          | 3.3        | `agente_central_atendimento.py`| ✅                                                             |
+| 3 — Handoff           | Apoio à Investigação (Nominatim)                        | 3.4        | `agente_investigacao.py`       | ✅                                                             |
+| 3 — Handoff           | 3º especialista (DDD/telefonia)                         | 3.5        | `agente_investigacao.py`       | ✅                                                             |
+| —                     | Agente como ferramenta (`as_tool`, variação do handoff) | —          | `agente_handoff2.py`           | ✅ (mecanismo alternativo, não numerado no deck)               |
+| 4 — Saída estruturada | `output_type` com Pydantic (campos simples)             | 4.1        | `agente_output.py`             | ✅                                                             |
+| 4 — Saída estruturada | Modelos aninhados + lista (`Ocorrencia`/`Envolvido`)    | 4.2        | `agente_bo.py`                 | ✅                                                             |
+| 4 — Saída estruturada | `Literal` (valores fechados) + `bool`                   | 4.3        | `agente_triagem.py`            | ✅                                                             |
+| 5 — Sessão            | `SQLiteSession` entre turnos                            | 5.1        | `agente_session.py`            | ✅                                                             |
+| 5 — Sessão            | Sessão + ferramenta (comparação sem repetir API)        | 5.2        | `agente_sessao2.py`            | ✅                                                             |
+| 5 — Sessão            | Isolamento entre sessões (dois ids)                     | 5.3        | `agente_isolamento.py`         | ✅                                                             |
+| 5 — Sessão            | Coleta progressiva                                      | 5.4        | `agente_coleta.py`             | ✅                                                             |
+| 5 — Sessão            | Memória em arquivo (`db_path`) reutilizável             | 5.5        | `agente_memoria.py`            | ✅                                                             |
+| 6 — Guardrails        | Input guardrail em Python puro (lista de palavras)      | 6.1        | `agente_guardrail_puro.py`     | ✅                                                             |
+| 6 — Guardrails        | Input guardrail com LLM (LGPD)                          | 6.2        | `agente_guardrail.py`          | ✅                                                             |
+| 6 — Guardrails        | Output guardrail (regex, sem LLM)                       | 6.3        | `agente_output_guardrail.py`   | ✅                                                             |
+| 7 — Streaming         | Tokens um a um                                          | 7.1        | `agente_streaming.py`          | ✅                                                             |
+| 7 — Streaming         | Streaming + ciclo de vida da ferramenta                 | 7.2        | `agente_streaming.py`          | ✅                                                             |
+| 7 — Streaming         | Streaming + handoff (instante da transferência)         | 7.3        | `agente_streaming.py`          | ✅                                                             |
+| 8 — Integrador        | tools + guardrail + output_type + sessão num só agente  | —          | `agente_integrador.py`         | ✅                                                             |
+| 9 — Produção          | `max_turns` / `MaxTurnsExceeded`                        | 9.1        | `agente_producao.py`           | ✅                                                             |
+| 9 — Produção          | Prompt injection indireta (conteúdo de ferramenta)      | 9.2        | `agente_producao.py`           | ✅                                                             |
+| Extra                 | API FastAPI expondo os agentes                          | —          | `main.py`                      | ✅                                                             |
 
-**O que falta para fechar 100% das Seções 3–9:** os exercícios 3.3–3.5 (que exigem as tools de ViaCEP/CNPJ/Nominatim/DDD ainda pendentes na Aula 1 — ver `aula1/aula1.md` §8.2) e o guardrail 6.1 em Python puro (sem LLM), que é um degrau mais simples que o 6.2 já implementado.
+**Status de cobertura:** 100% dos exercícios e capacidades das Seções 1 a 9 do deck base foram implementados entre `aula1/` e `aula2/`.
 
 ---
 
@@ -64,6 +64,9 @@ Cada linha é uma capacidade do deck da Aula 1, com o(s) arquivo(s) desta pasta 
 | `agente_streaming.py`        | **Streaming** (tokens + ciclo de vida da tool + handoff).                                   |
 | `agente_integrador.py`       | **Integrador** (tool + sessão + guardrail + `output_type`).                                 |
 | `agente_handoff_callback.py` | **Handoff** com callback de auditoria (`on_handoff`).                                       |
+| `agente_central_atendimento.py` | **Central de Atendimento** (handoff + tools: Open-Meteo + ViaCEP) (3.3).                     |
+| `agente_investigacao.py`     | **Apoio à Investigação** (CNPJ/BrasilAPI + Nominatim + DDD/BrasilAPI) (3.4 e 3.5).          |
+| `agente_guardrail_puro.py`   | **Guardrail de entrada determinístico** (Python puro com tripwire, sem LLM) (6.1).          |
 | `agente_producao.py`         | **Produção** (`max_turns` + prompt injection indireta).                                     |
 | `main.py`                    | API REST (FastAPI) expondo os agentes.                                                      |
 | `.env`                       | Configuração do provedor (Zen como padrão, Ollama como reserva).                            |
@@ -148,6 +151,32 @@ triador = Agent(
 - **`handoff(agente, on_handoff=callback)`:** em vez de colocar o `Agent` puro na lista `handoffs=[...]`, envolve-o na função `handoff()` do SDK, que aceita um callback assíncrono disparado no exato momento em que a transferência acontece — antes de o especialista começar a responder. _(arquivo: `agente_handoff_callback.py`)_
 - **Assinatura do callback:** recebe apenas o `ctx` (contexto de execução) — não recebe a mensagem nem o agente de destino diretamente, então qualquer identificação de "para quem" deve vir de um callback diferente por especialista (aqui os dois usam a mesma função, então o log não diferencia o destino; para logar o nome do especialista, seria necessário uma função `on_handoff` distinta por `handoff(...)`, ou capturar o nome via _closure_). _(arquivo: `agente_handoff_callback.py`)_
 - **Triagem seletiva:** a instrução "perguntas triviais você responde você mesmo" é o que faz `"Bom dia!"` **não** disparar handoff nenhum — só perguntas de matemática/história acionam a transferência (e, com ela, o `[LOG]`). _(arquivo: `agente_handoff_callback.py`)_
+
+### 3.2 Central de Atendimento ao Cidadão: Handoff + Tools Reais (exercício 3.3) — `agente_central_atendimento.py`
+
+Combina a delegação de turno com ferramentas de APIs externas reais. Temos dois agentes especialistas:
+- `Especialista_Clima`: munido da tool `get_temperatura` (API Open-Meteo).
+- `Especialista_Enderecos`: munido da tool `consultar_cep` (API ViaCEP).
+
+O `Triador_Central_Atendimento` avalia a intenção do cidadão e realiza o handoff (`handoffs=[agente_clima, agente_enderecos]`). O modelo toma duas decisões autônomas e sucessivas:
+1. O triador decide **para quem encaminhar** o turno;
+2. O especialista aciona sua **ferramenta de consulta externa** e gera a resposta final ao cidadão.
+
+O retorno pode ser auditado inspecionando `resultado.last_agent.name`, que confirma qual especialista assumiu e concluiu o atendimento. _(arquivo: `agente_central_atendimento.py`)_
+
+### 3.3 Apoio à Investigação e o Custo do 3º Especialista (exercícios 3.4 e 3.5) — `agente_investigacao.py`
+
+Cenário voltado para inteligência e segurança pública (PCDF):
+- **Especialista Cadastral (3.4):** consulta CNPJ na Receita Federal via BrasilAPI, trazendo razão social, situação e sócios (com CPFs mascarados na origem conforme LGPD).
+- **Especialista de Localização (3.4):** geocodificação de endereços via OpenStreetMap Nominatim. **Ponto crítico:** o Nominatim bloqueia requisições sem o header HTTP `User-Agent`; o script configura cabeçalho identificador para garantir resposta `200 OK`.
+- **Especialista de Telefonia (3.5):** consulta de prefixo DDD via BrasilAPI, retornando estado e cidades atendidas.
+
+**Demonstração prática do Exercício 3.5:** Para plugar o terceiro especialista (telefonia) na equipe de investigação existente, foram necessários apenas **3 passos puramente declarativos**:
+1. Declarar a ferramenta `@function_tool def consultar_ddd(...)`;
+2. Instanciar o `Agent(name="Especialista_Telefonia", tools=[consultar_ddd])`;
+3. Incluir o novo agente na lista `handoffs=[..., agente_telefonia]` e adicionar uma linha nas `instructions` do triador.
+
+Nenhum `if/else` procedural foi escrito ou refatorado. _(arquivo: `agente_investigacao.py`)_
 
 ---
 
@@ -395,6 +424,9 @@ python -m aula2.agente_output_guardrail  # output guardrail regex CPF (6.3)
 python -m aula2.agente_streaming      # streaming (7.1-7.3)
 python -m aula2.agente_integrador     # integrador (8)
 python -m aula2.agente_handoff_callback  # handoff + callback (3.2)
+python -m aula2.agente_central_atendimento # central de atendimento: handoff + tools (3.3)
+python -m aula2.agente_investigacao        # apoio à investigação: CNPJ, Nominatim, DDD (3.4 e 3.5)
+python -m aula2.agente_guardrail_puro      # guardrail em Python puro com tripwire (6.1)
 python -m aula2.agente_producao       # max_turns + prompt injection (9)
 ```
 
@@ -414,10 +446,11 @@ Cada `Runner.run` é, por padrão, um atendente novo: o agente esquece o turno a
 
 ### 8.2 Guardrails (Seção 6)
 
-Travas que rodam em paralelo ao agente: um `input_guardrail` inspeciona o pedido **antes** de gastar tokens; um `output_guardrail` inspeciona a resposta **antes** de sair. Se a trava detecta algo proibido, dispara o _tripwire_ e a execução para com exceção. _(arquivos: `agente_guardrail.py`, `agente_output_guardrail.py`)_
+Travas que rodam em paralelo ao agente: um `input_guardrail` inspeciona o pedido **antes** de gastar tokens; um `output_guardrail` inspeciona a resposta **antes** de sair. Se a trava detecta algo proibido, dispara o _tripwire_ e a execução para com exceção. _(arquivos: `agente_guardrail_puro.py`, `agente_guardrail.py`, `agente_output_guardrail.py`)_
 
-- **`agente_guardrail.py`** — `input_guardrail` com LLM: um agente classificador (`output_type`) avalia similaridade a tópicos proibidos e dispara o tripwire.
-- **`agente_output_guardrail.py`** — `output_guardrail` com **regex** de CPF (sem LLM): barra respostas que vazam um CPF.
+- **`agente_guardrail_puro.py` (6.1)** — `input_guardrail` determinístico em **Python puro** (sem LLM): inspeciona o texto do usuário procurando palavras de uma lista restrita (`receita`, `futebol`, `fofoca`). Se detectado, ativa `tripwire_triggered=True`, interrompendo a execução antes de chamar o modelo e lançando `InputGuardrailTripwireTriggered` com custo zero de inferência.
+- **`agente_guardrail.py` (6.2)** — `input_guardrail` com **LLM**: um agente classificador semântico (`output_type`) avalia similaridade conceitual a tópicos proibidos e dispara o tripwire.
+- **`agente_output_guardrail.py` (6.3)** — `output_guardrail` com **regex** de CPF (sem LLM): inspeciona o retorno final e barra respostas que vazem um CPF, lançando `OutputGuardrailTripwireTriggered`.
 
 > **Conexão com LGPD (ver `aula1/aula1.md` §6):** `agente_output_guardrail.py` é a aplicação mais literal do princípio "trava de entrada e de saída" — o CPF é barrado na **saída** mesmo que o usuário o tenha fornecido na entrada. `agente_integrador.py` (§8.4) combina isso com uma trava de **entrada** (`bloquear_dados_sensiveis`), cobrindo os dois lados da mesma frase-resumo de LGPD.
 
