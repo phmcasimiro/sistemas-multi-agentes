@@ -124,126 +124,108 @@ def construir_grafo(modelo, jev):
     # FASE A -- AS FUNÇÕES
     # ==============================================================================================
 
-    """
-    FUNÇÃO PONTO 1 -- receber.
-        limpa a entrada e inicializa TODOS os 8 campos do Estado ("" / 0.0)
-        dica: {"solicitacao": estado["solicitacao"].strip(), "p_urgente": 0.0, "p_sensivel": 0.0, "assunto": "", ...}
-    """
-    #colocar a função 1 aqui
-    # def receber(estado):
+    # FUNÇÃO PONTO 1 -- receber
+    def receber(estado: Estado) -> dict:
+        return {
+            "solicitacao": estado.get("solicitacao", "").strip(),
+            "p_urgente": 0.0,
+            "p_sensivel": 0.0,
+            "assunto": "",
+            "confianca": 0.0,
+            "informacao": "",
+            "encaminhamento": "",
+            "resposta": "",
+        }
 
-    """
-    FUNÇÃO PONTO 2 -- avaliar (nó do JEV: a decisão TIPADA).
-        respostas = jev.decidir(estado["solicitacao"], PERGUNTAS_JEV)       # UMA chamada, 3 perguntas
-        devolva os NÚMEROS, sem interpretar texto:
-            "p_urgente":  respostas["urgente"]["noul"]            (probabilidade de "sim", 0 a 1)
-            "p_sensivel": respostas["sensivel"]["noul"]
-            "assunto":    respostas["assunto"]["choice"]          (a opção escolhida)
-            "confianca":  respostas["assunto"]["confidence"]      (a confiança nela, 0 a 1)
-    """
-    #colocar a função 2 aqui
-    # def avaliar(estado):
+    # FUNÇÃO PONTO 2 -- avaliar (nó do JEV: a decisão TIPADA)
+    def avaliar(estado: Estado) -> dict:
+        respostas = jev.decidir(estado["solicitacao"], PERGUNTAS_JEV)
+        return {
+            "p_urgente": float(respostas["urgente"]["noul"]),
+            "p_sensivel": float(respostas["sensivel"]["noul"]),
+            "assunto": str(respostas["assunto"]["choice"]),
+            "confianca": float(respostas["assunto"]["confidence"]),
+        }
 
-    """
-    FUNÇÃO PONTO 3 -- o caminho URGENTE: encaminhar (tool), responder (LLM) e o ROTEADOR.
-        encaminhar: {"encaminhamento": encaminhar_plantao(estado["solicitacao"])}
-        responder:  {"resposta": modelo.gerar(prompt_responder(estado))}
-        rotear_apos_avaliar(estado): se estado["p_urgente"] >= LIMIAR_URGENTE devolva "urgente"; senão "outros"
-        (é o roteador que DECIDE PELOS NÚMEROS; ele só LÊ o estado)
-    """
-    #colocar as funções do ponto 3 aqui
-    # def encaminhar(estado):
+    # FUNÇÕES PONTO 3 -- o caminho URGENTE: encaminhar, responder e roteador
+    def encaminhar(estado: Estado) -> dict:
+        return {"encaminhamento": encaminhar_plantao(estado["solicitacao"])}
 
-    # def responder(estado):
+    def responder(estado: Estado) -> dict:
+        return {"resposta": modelo.gerar(prompt_responder(estado))}
 
-    # def rotear_apos_avaliar(estado):
+    def rotear_apos_avaliar(estado: Estado) -> str:
+        # 1º: Urgência (risco imediato tem prioridade máxima)
+        if estado["p_urgente"] >= LIMIAR_URGENTE:
+            return "urgente"
+        # 2º: Dado sensível (Ponto 4)
+        if estado["p_sensivel"] >= LIMIAR_SENSIVEL:
+            return "sensivel"
+        # 3º: Incerto / confiança baixa (Ponto 5)
+        if estado["confianca"] < LIMIAR_CONFIANCA:
+            return "incerto"
+        # 4º e 5º: Base de conhecimento (Ponto 6)
+        if estado["assunto"] in BASE_CONHECIMENTO:
+            return "com_base"
+        return "sem_base"
 
-    """
-    FUNÇÃO PONTO 4 -- o DADO SENSÍVEL: alertar_dado_sensivel e EDITE o roteador.
-        alertar_dado_sensivel: {"resposta": "Por segurança, não envie CPF, senhas ou números de cartão por aqui. ..."}  (e encerra)
-        no roteador, DEPOIS da regra do urgente: se estado["p_sensivel"] >= LIMIAR_SENSIVEL devolva "sensivel"
-        (a ORDEM das regras é a prioridade dos caminhos: risco à vida vem antes de dado sensível)
-    """
-    #colocar a função 4 aqui
-    # def alertar_dado_sensivel(estado):
+    # FUNÇÃO PONTO 4 -- o DADO SENSÍVEL: alertar e encerrar
+    def alertar_dado_sensivel(estado: Estado) -> dict:
+        return {
+            "resposta": "Por segurança, não envie CPF, senhas ou números de cartão por aqui. "
+                        "Sua solicitação foi cancelada para proteger seus dados."
+        }
 
-    """
-    FUNÇÃO PONTO 5 -- o INCERTO: pedir_esclarecimento e EDITE o roteador.
-        pedir_esclarecimento: {"resposta": "Não consegui entender com segurança qual é o seu assunto. Pode explicar ...?"}  (e encerra)
-        no roteador, depois das regras anteriores: se estado["confianca"] < LIMIAR_CONFIANCA devolva "incerto"
-        (o JEV devolve a CONFIANÇA: com ela o grafo pode NÃO adivinhar)
-    """
-    #colocar a função 5 aqui
-    # def pedir_esclarecimento(estado):
+    # FUNÇÃO PONTO 5 -- o INCERTO: pedir esclarecimento e encerrar
+    def pedir_esclarecimento(estado: Estado) -> dict:
+        return {
+            "resposta": "Não consegui entender com segurança qual é o seu assunto. "
+                        "Poderia explicar melhor e fornecer mais detalhes sobre o que precisa?"
+        }
 
-    """
-    FUNÇÃO PONTO 6 -- COM BASE e SEM BASE: pesquisar (tool) e a regra final do roteador.
-        pesquisar: {"informacao": BASE_CONHECIMENTO.get(estado["assunto"], "")}      ("" se o assunto não está na base)
-        roteador, regra final: "com_base" se estado["assunto"] está em BASE_CONHECIMENTO, senão "sem_base"
-        (o assunto "outro" não está na base: o grafo admite que não sabe e o LLM NÃO inventa)
-    """
-    #colocar a função 6 aqui
-    # def pesquisar(estado):
+    # FUNÇÃO PONTO 6 -- COM BASE e SEM BASE: pesquisar procedimento
+    def pesquisar(estado: Estado) -> dict:
+        return {"informacao": BASE_CONHECIMENTO.get(estado["assunto"], "")}
 
     # ==============================================================================================
     # FASE B -- LIGAR OS PONTOS
     # ==============================================================================================
 
-    """
-    PONTO 1 -- receber.  Grafo: START -> receber -> END
-        dica: construtor.add_node("receber", receber)  e  construtor.add_edge(START, "receber")
-    """
     construtor = StateGraph(Estado)
-    # construtor.add_node("receber", receber)
-    # construtor.add_edge(START, "receber")
 
-    # teste isolado do ponto 1: construtor.add_edge("receber", END)   (apague no ponto 2)
+    # Registro de todos os nós
+    construtor.add_node("receber", receber)
+    construtor.add_node("avaliar", avaliar)
+    construtor.add_node("encaminhar", encaminhar)
+    construtor.add_node("responder", responder)
+    construtor.add_node("alertar_dado_sensivel", alertar_dado_sensivel)
+    construtor.add_node("pedir_esclarecimento", pedir_esclarecimento)
+    construtor.add_node("pesquisar", pesquisar)
 
-    """
-    PONTO 2 -- avaliar (JEV).  Grafo: START -> receber -> avaliar -> END
-        dica: add_node("avaliar", avaliar)  e  add_edge("receber", "avaliar")
-    """
-    # construtor.add_node("avaliar", avaliar)
-    # construtor.add_edge("receber", "avaliar")
+    # Arestas do fluxo inicial
+    construtor.add_edge(START, "receber")
+    construtor.add_edge("receber", "avaliar")
 
-    # teste isolado do ponto 2: construtor.add_edge("avaliar", END)   (apague no ponto 3)
+    # Arestas condicionais a partir da avaliação do JEV
+    construtor.add_conditional_edges(
+        "avaliar",
+        rotear_apos_avaliar,
+        {
+            "urgente": "encaminhar",
+            "sensivel": "alertar_dado_sensivel",
+            "incerto": "pedir_esclarecimento",
+            "com_base": "pesquisar",
+            "sem_base": "responder",
+        },
+    )
 
-    """
-    PONTO 3 -- urgente.  avaliar -> (urgente) encaminhar -> responder -> END ;  (outros) -> END
-        dica: add_node de encaminhar e de responder;
-              add_conditional_edges("avaliar", rotear_apos_avaliar, {"urgente": "encaminhar", "outros": END})
-              add_edge("encaminhar", "responder")  e  add_edge("responder", END)
-    """
-    # construtor.add_node("encaminhar", encaminhar)
-    # construtor.add_node("responder", responder)
-    # construtor.add_conditional_edges(...)
-    # construtor.add_edge("encaminhar", "responder")
-    # construtor.add_edge("responder", END)
+    # Arestas de finalização
+    construtor.add_edge("encaminhar", "responder")
+    construtor.add_edge("pesquisar", "responder")
+    construtor.add_edge("responder", END)
+    construtor.add_edge("alertar_dado_sensivel", END)
+    construtor.add_edge("pedir_esclarecimento", END)
 
-    """
-    PONTO 4 -- dado sensível.  avaliar -> (sensivel) alertar_dado_sensivel -> END
-        dica: add_node("alertar_dado_sensivel", alertar_dado_sensivel); add_edge("alertar_dado_sensivel", END)
-              no mapa de add_conditional_edges acrescente  "sensivel": "alertar_dado_sensivel"
-    """
-    # construtor.add_node("alertar_dado_sensivel", alertar_dado_sensivel)
-    # construtor.add_edge("alertar_dado_sensivel", END)
-
-    """
-    PONTO 5 -- incerto.  avaliar -> (incerto) pedir_esclarecimento -> END
-        dica: add_node("pedir_esclarecimento", pedir_esclarecimento); add_edge("pedir_esclarecimento", END)
-              no mapa acrescente  "incerto": "pedir_esclarecimento"
-    """
-    # construtor.add_node("pedir_esclarecimento", pedir_esclarecimento)
-    # construtor.add_edge("pedir_esclarecimento", END)
-
-    """
-    PONTO 6 -- com base e sem base.  avaliar -> (com_base) pesquisar -> responder ;  (sem_base) -> responder
-        dica: add_node("pesquisar", pesquisar); add_edge("pesquisar", "responder")
-              no mapa: TROQUE  "outros": END  por  "com_base": "pesquisar"  e  "sem_base": "responder"
-              (o mapa final tem 5 rótulos: urgente, sensivel, incerto, com_base e sem_base)
-    """
-    # construtor.add_node("pesquisar", pesquisar)
-    # construtor.add_edge("pesquisar", "responder")
     return construtor.compile()
 
 
