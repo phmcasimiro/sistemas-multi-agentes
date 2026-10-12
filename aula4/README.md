@@ -24,6 +24,20 @@ Esta aula muda o foco de *o que um agente sabe fazer sozinho* (Aulas 1-3) para *
 
 ## 1. Síncrono × Assíncrono: o eixo da aula inteira
 
+```mermaid
+flowchart TD
+    subgraph Sincrono["Comunicação Síncrona (In-Process / Handoff)"]
+        A1["Agente Triador"] -->|Bloqueia e transfere turno| B1["Agente Jurídico"]
+        B1 -->|Retorna resposta| A1
+    end
+
+    subgraph Assincrono["Comunicação Assíncrona (Distribuída / MQTT Pub-Sub)"]
+        Pub["Agente Coletor (Publisher)"] -->|Publica no tópico\npcdf/demo/ocorrencias/nova| Broker["Broker MQTT\n(EMQX / Mosquitto)"]
+        Broker -->|Entrega evento| Sub1["Agente Triagem (Subscriber com LLM)"]
+        Broker -->|Entrega cópia (Fan-Out)| Sub2["Agente Estatística (Subscriber Analítico)"]
+    end
+```
+
 Tudo que a Aula 4 ensina se encaixa numa dessas duas colunas (deck, slide "Síncrono × assíncrono"):
 
 | | Síncrono | Assíncrono |
@@ -169,6 +183,13 @@ python -m aula4.ex7_triagem_cliente
 ---
 
 ## 6. Exercício 9 — Pipeline (esteira de 3 estágios)
+
+```mermaid
+flowchart LR
+    C["ex9_pipeline_coletor.py\n(Emite ocorrência crua)"] -->|"pcdf/demo/pipeline/entrada"| T["ex9_pipeline_triagem.py\n(Classifica com LLM)"]
+    T -->|"pcdf/demo/pipeline/juridico"| J["ex9_pipeline_juridico.py\n(Gera enquadramento legal)"]
+    J --> Fim["Parecer Final Consolidado"]
+```
 
 **Teoria (slide "Encadeando 3 estágios pelo tópico"):** cada estágio só conhece o tópico de **entrada** que assina e o de **saída** que publica — nunca os vizinhos do vizinho:
 

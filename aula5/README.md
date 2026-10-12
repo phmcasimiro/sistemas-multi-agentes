@@ -1,15 +1,42 @@
 # Aula 5 — MCP (Model Context Protocol)
 
 Cenário: CISP (Central Integrada de Segurança Pública, fictícia). Dados sintéticos.
-Conceitos em `aula5/TEORIA_MCP.md`. Este arquivo é o roteiro de execução.
+Conceitos detalhados em [`aula5.md`](aula5.md). Este arquivo consolida a teoria, arquitetura e o roteiro de execução.
 
-Este curso usa **uma venv, um `.env`, um `provedor.py` na raiz**, compartilhados
-por todas as aulas — diferente do material original do professor (venv/`.env`
-por aula). Não crie venv nem `.env` dentro de `aula5/`. Exceção: os serviços
-Docker (`agente/`, `mcp-*/`) têm `requirements.txt`/`Dockerfile` próprios,
-por rodarem em containers isolados do host.
+---
 
-## 1. Setup
+## 🏛️ Referencial Teórico: Por Que MCP?
+
+Na Aula 4, aprendemos como um agente fala com **outro agente** (A2A). Na Aula 5, respondemos a uma pergunta complementar: **como um agente acessa dados e ferramentas externas sem acoplamento direto?**
+
+### O Problema da Integração $N \times M$
+Sem um protocolo padronizado, cada novo agente precisa de código customizado para cada banco ou API. Três agentes e três bancos resultam em $3 \times 3 = 9$ conectores. Com 50 agentes e 20 sistemas legados, o custo salta para até $1.000$ integrações.
+O **Model Context Protocol (MCP)** resolve isso introduzindo uma camada cliente-servidor padronizada:
+- **Redução para $N + M$**: Cada sistema expõe um único **MCP Server**; qualquer agente cliente compatível com MCP descobre e consome essas ferramentas dinamicamente através do protocolo.
+- **Isolamento de Processos**: A ferramenta roda fora da memória do agente (via `stdio` ou `streamable HTTP`), com controle de permissões e auditoria independente.
+
+```mermaid
+flowchart TD
+    subgraph AgenteProcess["Processo do Agente"]
+        Agent["Agente de IA (CISP)"] <--> MCPClient["MCP Client SDK"]
+    end
+
+    subgraph Protocolo["Protocolo MCP (JSON-RPC 2.0 / stdio ou HTTP SSE)"]
+        MCPClient <-->|tools/list\ntools/call| S1["MCP Server Ocorrências\n(FastMCP / Porta 8001)"]
+        MCPClient <-->|tools/list\ntools/call| S2["MCP Server Operações\n(FastMCP / Porta 8002)"]
+        MCPClient <-->|tools/list\ntools/call| S3["MCP Server Serviços\n(FastMCP / Porta 8003)"]
+    end
+
+    subgraph Dados["Bancos e Fontes Heterogêneas"]
+        S1 <--> PG[("PostgreSQL\n(20.000 ocorrências)")]
+        S2 <--> MSSQL[("SQL Server\n(Viaturas e Unidades)")]
+        S3 <--> CSV[("Eventos da Cidade\n(CSV / Google Sheets)")]
+    end
+```
+
+---
+
+## 1. Setup e Infraestrutura
 
 ### 1.1 Pré-requisitos
 
