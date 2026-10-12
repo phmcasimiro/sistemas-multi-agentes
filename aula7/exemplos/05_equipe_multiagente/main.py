@@ -2,7 +2,7 @@
 Exemplo 05 -- EQUIPE MULTIAGENTE: especialistas como NÓS de um grafo (LangGraph).
 
 Juntamos o que vimos: especialistas (ex. 02) + estado compartilhado (ex. 03) +
-grafo da Aula 6. Cada especialista é um nó; o estado é o que circula entre eles:
+grafo da Aula 6. Cada especialista é um nó (que roda um Agent); o estado é o que circula entre eles:
 
     START -> orquestrador -> investigador -> juridico -> analista -> END
                  |               |              |            |
@@ -11,20 +11,20 @@ grafo da Aula 6. Cada especialista é um nó; o estado é o que circula entre el
 
 Quem é o ORQUESTRADOR? Quem decide a ORDEM e as condições de passagem entre os
 especialistas. Aqui ele é o próprio grafo (mais um nó de entrada que prepara o
-estado): a ordem é explícita e inspecionável. (Outra forma é um LLM que escolhe
-o próximo especialista; troca-se controle por flexibilidade. Nesta aula o
-controle é do grafo.)
+estado): a ordem é explícita e inspecionável. (Outra forma é um agente que escolhe
+o próximo especialista, com handoffs, como na Aula 4; troca-se controle por flexibilidade.
+Nesta aula o controle é do grafo.)
 
 Cada especialista poderia ter FERRAMENTAS diferentes -- conexão com a Aula 5:
 
     INVESTIGADOR -> MCP -> dados da contratação        JURÍDICO -> MCP -> base normativa
 
-Aqui os nós só chamam o LLM, para o código caber na tela; trocar por chamadas
+Aqui os agentes só conversam com o LLM, para o código caber na tela; trocar por chamadas
 MCP é o que fizemos no exemplo 11 da Aula 6.
 
 Rodar (LLM REAL: configure o .env; veja o README), a partir de aula7/:
     python exemplos\\05_equipe_multiagente\\main.py
-    $env:PROVEDOR = "claude"   # mesmo grafo, outro modelo (exige ANTHROPIC_API_KEY)
+    $env:PROVEDOR = "ollama"   # mesmo grafo, outro modelo (exige `ollama serve`)
 """
 import sys
 from pathlib import Path
@@ -32,13 +32,15 @@ from typing import TypedDict
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
+from agents import Runner
 from langgraph.graph import END, START, StateGraph
 
+import agentes
 import prompts
 from caso import DENUNCIA_045
-from provedor import obter_modelo
+from provedor import configurar
 
-modelo = obter_modelo()  # LLM REAL: PROVEDOR no .env (openai ou ollama)
+MODELO = configurar()  # LLM REAL: PROVEDOR no .env (openai ou ollama)
 
 
 class Estado(TypedDict):
@@ -57,19 +59,19 @@ def orquestrador(estado: Estado) -> dict:
 
 def investigador(estado: Estado) -> dict:
     print("[INVESTIGADOR] levantando os fatos")
-    return {"investigacao": modelo.gerar(prompts.investigar(estado["solicitacao"]))}
+    return {"investigacao": Runner.run_sync(agentes.investigador, estado["solicitacao"]).final_output}
 
 
 def juridico(estado: Estado) -> dict:
     print("[JURÍDICO]     enquadrando na lei")
-    return {"analise_juridica": modelo.gerar(prompts.juridico(estado["investigacao"]))}
+    return {"analise_juridica": Runner.run_sync(agentes.juridico, estado["investigacao"]).final_output}
 
 
 def analista(estado: Estado) -> dict:
     print("[ANALISTA]     avaliando risco e recomendando")
     fatos, enquadramento = estado["investigacao"], estado["analise_juridica"]
-    risco = modelo.gerar(prompts.risco(fatos, enquadramento))
-    recomendacao = modelo.gerar(prompts.recomendar(fatos, enquadramento, risco))
+    risco = Runner.run_sync(agentes.risco, prompts.entrada_risco(fatos, enquadramento)).final_output
+    recomendacao = Runner.run_sync(agentes.redator, prompts.entrada_recomendar(fatos, enquadramento, risco)).final_output
     return {"analise_risco": risco, "recomendacao": recomendacao}
 
 
@@ -91,7 +93,7 @@ construtor.add_edge("analista", END)
 app = construtor.compile()
 
 if __name__ == "__main__":
-    print(f"Modelo em uso: {modelo.nome}\n")
+    print(f"Modelo em uso: {MODELO}\n")
     estado: dict = {"solicitacao": DENUNCIA_045}
     caminho = []
     for passo in app.stream(estado, stream_mode="updates"):

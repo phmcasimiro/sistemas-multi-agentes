@@ -16,7 +16,7 @@ REGRA DE OURO DO PARALELISMO: ramos paralelos escrevem em campos DIFERENTES do e
 (juridico -> analise_juridica; risco -> analise_risco.) Se os dois escrevessem no mesmo
 campo, o LangGraph levantaria InvalidUpdateError, a menos que o campo tenha um "reducer".
 
-O GANHO aparece no relógio, porque cada nó faz uma chamada REAL ao LLM: em sequência o tempo é a
+O GANHO aparece no relógio, porque cada nó roda um Agent com chamada REAL ao LLM: em sequência o tempo é a
 SOMA das duas chamadas; em paralelo, ~a MAIOR delas.
   - Com OpenAI o ganho é claro (as duas requisições correm juntas).
   - Com Ollama local, o servidor pode atender UMA requisição por vez (depende da memória/configuração,
@@ -34,13 +34,15 @@ from typing import TypedDict
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
+from agents import Runner
 from langgraph.graph import END, START, StateGraph
 
+import agentes
 import prompts
 from caso import DENUNCIA_045
-from provedor import obter_modelo
+from provedor import configurar
 
-modelo = obter_modelo()  # LLM REAL: PROVEDOR no .env (openai ou ollama)
+MODELO = configurar()  # LLM REAL: PROVEDOR no .env (openai ou ollama)
 
 
 class Estado(TypedDict):
@@ -53,27 +55,28 @@ class Estado(TypedDict):
 
 def investigador(estado: Estado) -> dict:
     print("[INVESTIGADOR]")
-    return {"investigacao": modelo.gerar(prompts.investigar(estado["solicitacao"]))}
+    return {"investigacao": Runner.run_sync(agentes.investigador, estado["solicitacao"]).final_output}
 
 
 def juridico(estado: Estado) -> dict:
     print("[JURÍDICO]     início")
-    parecer = modelo.gerar(prompts.juridico(estado["investigacao"]))
+    parecer = Runner.run_sync(agentes.juridico, estado["investigacao"]).final_output
     print("[JURÍDICO]     fim")
     return {"analise_juridica": parecer}
 
 
 def risco(estado: Estado) -> dict:
     print("[RISCO]        início")
-    parecer = modelo.gerar(prompts.risco(estado["investigacao"]))  # só os FATOS: não depende do jurídico
+    # só os FATOS: não depende do jurídico
+    parecer = Runner.run_sync(agentes.risco, prompts.entrada_risco(estado["investigacao"])).final_output
     print("[RISCO]        fim")
     return {"analise_risco": parecer}
 
 
 def consolidar(estado: Estado) -> dict:
     print("[CONSOLIDAR]   recebeu os DOIS pareceres")
-    return {"recomendacao": modelo.gerar(
-        prompts.recomendar(estado["investigacao"], estado["analise_juridica"], estado["analise_risco"]))}
+    entrada = prompts.entrada_recomendar(estado["investigacao"], estado["analise_juridica"], estado["analise_risco"])
+    return {"recomendacao": Runner.run_sync(agentes.redator, entrada).final_output}
 
 
 def construir_paralelo():
@@ -113,7 +116,7 @@ def medir(titulo: str, app) -> float:
 
 
 if __name__ == "__main__":
-    print(f"Modelo em uso: {modelo.nome}\n")
+    print(f"Modelo em uso: {MODELO}\n")
     seq = medir("SEQUENCIAL: juridico -> risco", construir_sequencial())
     par = medir("PARALELO: juridico e risco juntos", construir_paralelo())
     print(f"Sequencial {seq:.1f} s x paralelo {par:.1f} s.")

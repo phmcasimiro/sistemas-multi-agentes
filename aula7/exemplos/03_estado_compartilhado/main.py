@@ -15,9 +15,9 @@ escreve APENAS o que é sua responsabilidade (exatamente como na Aula 6):
                        |
                  ESTADO FINAL
 
-Cada especialista é uma função  estado -> atualização do estado. Nenhum
-especialista chama outro; ninguém passa strings "à mão". Ainda é Python puro:
-o "motor" que junta as atualizações são 3 linhas (veja executar()).
+Cada especialista é uma função  estado -> atualização do estado, e por dentro roda um Agent
+(os agentes já vêm prontos em agentes.py). Nenhum especialista chama outro; ninguém passa
+strings "à mão". Ainda é Python puro: o "motor" que junta as atualizações são 3 linhas (veja executar()).
 
 ESTADO x MEMÓRIA  (não são sinônimos)
 
@@ -38,11 +38,14 @@ from typing import TypedDict
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
+from agents import Runner
+
+import agentes
 import prompts
 from caso import DENUNCIA_045, DENUNCIA_051
-from provedor import obter_modelo
+from provedor import configurar
 
-modelo = obter_modelo()  # LLM REAL: PROVEDOR no .env (openai ou ollama)
+MODELO = configurar()  # LLM REAL: PROVEDOR no .env (openai ou ollama)
 
 
 class Estado(TypedDict):
@@ -55,21 +58,22 @@ class Estado(TypedDict):
 
 def investigador(estado: Estado) -> dict:
     print("[INVESTIGADOR] lê: solicitacao")
-    fatos = modelo.gerar(prompts.investigar(estado["solicitacao"]))
+    fatos = Runner.run_sync(agentes.investigador, estado["solicitacao"]).final_output
     return {"investigacao": fatos}  # só o que é dele
 
 
 def juridico(estado: Estado) -> dict:
     print("[JURÍDICO]     lê: investigacao")
-    texto = modelo.gerar(prompts.juridico(estado["investigacao"]))
+    texto = Runner.run_sync(agentes.juridico, estado["investigacao"]).final_output
     return {"analise_juridica": texto}
 
 
 def analista(estado: Estado) -> dict:
     print("[ANALISTA]     lê: investigacao, analise_juridica")
     fatos, enquadramento = estado["investigacao"], estado["analise_juridica"]
-    risco = modelo.gerar(prompts.risco(fatos, enquadramento))
-    recomendacao = modelo.gerar(prompts.recomendar(fatos, enquadramento, risco))
+    risco = Runner.run_sync(agentes.risco, prompts.entrada_risco(fatos, enquadramento)).final_output
+    recomendacao = Runner.run_sync(
+        agentes.redator, prompts.entrada_recomendar(fatos, enquadramento, risco)).final_output
     return {"analise_risco": risco, "recomendacao": recomendacao}
 
 
@@ -95,7 +99,7 @@ def executar(solicitacao: str) -> Estado:
 
 
 if __name__ == "__main__":
-    print(f"Modelo em uso: {modelo.nome}\n")
+    print(f"Modelo em uso: {MODELO}\n")
 
     estado = executar(DENUNCIA_045)
     print("\nESTADO FINAL:")

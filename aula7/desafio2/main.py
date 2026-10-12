@@ -1,5 +1,5 @@
 """
-Desafio 2 da Aula 7 -- esqueleto. Implemente construir_grafo(); o resto já vem pronto.
+Desafio 2 da Aula 7 -- parecer em paralelo com aprovação em dois níveis.
 
 Rodar, a partir de aula7/:
     python desafio2/main.py
@@ -11,10 +11,12 @@ from typing import TypedDict
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from langgraph.graph import END, START, StateGraph
-from langgraph.types import Command, interrupt
+from agents import Runner  # noqa: F401  (roda os agentes: Runner.run_sync(agente, entrada).final_output)
+from langgraph.graph import END, START, StateGraph  # noqa: F401
+from langgraph.types import Command, interrupt  # noqa: F401
 
-import prompts  # noqa: F401  (os prompts dos especialistas)
+import agentes  # noqa: F401  (os agentes prontos: investigador, juridico, risco, classificador, redator, ...)
+import prompts  # noqa: F401  (entradas dos agentes e nivel_de)
 from caso import DENUNCIA_045, DENUNCIA_BAIXO_VALOR
 
 MAX_TENTATIVAS = 3
@@ -34,8 +36,8 @@ class Estado(TypedDict):
     status: str           # "aprovada" | "limite_de_revisoes" | "negada_pelo_diretor"
 
 
-def construir_grafo(modelo, checkpointer):
-    """TODO: monte o grafo (nós, roteadores e arestas) e devolva g.compile(checkpointer=checkpointer).
+def construir_grafo(checkpointer):
+    """Monta o grafo (nós, roteadores e arestas) e devolve g.compile(checkpointer=checkpointer).
 
     Nós (nomes exatos): receber, investigar, juridico, risco, consolidar, aprovacao_gestor, revisar,
     aprovacao_diretor, finalizar, encerrar, negar.
@@ -62,17 +64,107 @@ def construir_grafo(modelo, checkpointer):
 
     Status final: "aprovada" | "limite_de_revisoes" | "negada_pelo_diretor".
 
-    Como chamar o LLM (REAL; os prompts já estão prontos em prompts.py):
-        investigar -> modelo.gerar(prompts.investigar(estado["solicitacao"]))
-        juridico   -> modelo.gerar(prompts.juridico(estado["investigacao"]))
-        risco      -> parecer = modelo.gerar(prompts.risco(estado["investigacao"]))          # vai em analise_risco
-                      classe = modelo.gerar(prompts.classificar_risco(estado["solicitacao"], estado["investigacao"]))
+    Como chamar os agentes (REAIS; já estão prontos em agentes.py, e as entradas em prompts.py):
+        investigar -> Runner.run_sync(agentes.investigador, estado["solicitacao"]).final_output
+        juridico   -> Runner.run_sync(agentes.juridico, estado["investigacao"]).final_output
+        risco      -> parecer = Runner.run_sync(agentes.risco, prompts.entrada_risco(estado["investigacao"])).final_output
+                      # vai em analise_risco
+                      entrada = prompts.entrada_classificar(estado["solicitacao"], estado["investigacao"])
+                      classe = Runner.run_sync(agentes.classificador, entrada).final_output
                       nivel_risco = prompts.nivel_de(classe)   # "alto" | "baixo": é ele que DECIDE o caminho
-        consolidar -> modelo.gerar(prompts.recomendar(investigacao, analise_juridica, analise_risco, feedback_humano))
+        consolidar -> entrada = prompts.entrada_recomendar(investigacao, analise_juridica, analise_risco, feedback_humano)
+                      Runner.run_sync(agentes.redator, entrada).final_output
 
     Veja o enunciado em README.md e os exemplos 07 e 08 da aula.
     """
-    raise NotImplementedError("Implemente construir_grafo()")
+    def receber(estado):
+        return {"solicitacao": estado["solicitacao"].strip(), "investigacao": "", "analise_juridica": "",
+                "analise_risco": "", "nivel_risco": "", "parecer": "", "aprovado": False,
+                "feedback_humano": "", "tentativas": 0, "status": ""}
+
+    def investigar(estado):
+        return {"investigacao": Runner.run_sync(agentes.investigador, estado["solicitacao"]).final_output}
+
+    def juridico(estado):
+        return {"analise_juridica": Runner.run_sync(agentes.juridico, estado["investigacao"]).final_output}
+
+    def risco(estado):
+        parecer = Runner.run_sync(agentes.risco, prompts.entrada_risco(estado["investigacao"])).final_output
+        entrada = prompts.entrada_classificar(estado["solicitacao"], estado["investigacao"])
+        classe = Runner.run_sync(agentes.classificador, entrada).final_output
+        return {"analise_risco": parecer, "nivel_risco": prompts.nivel_de(classe)}
+
+    def consolidar(estado):
+        tentativa = estado["tentativas"] + 1
+        entrada = prompts.entrada_recomendar(estado["investigacao"], estado["analise_juridica"],
+                                             estado["analise_risco"], estado["feedback_humano"])
+        parecer = Runner.run_sync(agentes.redator, entrada).final_output
+        return {"parecer": parecer, "tentativas": tentativa}
+
+    def aprovacao_gestor(estado):
+        linha = "=" * 60
+        resumo = (
+            f"{linha}\nPARECER PARA APROVAÇÃO DO GESTOR "
+            f"(versão {estado['tentativas']} de no máximo {MAX_TENTATIVAS})\n{linha}\n"
+            f"Investigação    : {estado['investigacao']}\n"
+            f"Análise jurídica: {estado['analise_juridica']}\n"
+            f"Análise de risco: {estado['analise_risco']}\n"
+            f"Nível de risco  : {estado['nivel_risco']}\n"
+            f"Parecer         : {estado['parecer']}\n{linha}"
+        )
+        resposta = interrupt({"resumo": resumo, "pergunta": "O gestor aprova o parecer? [sim/não]"})
+        return {"aprovado": resposta["aprovado"], "feedback_humano": resposta.get("feedback", "")}
+
+    def revisar(estado):
+        return {}
+
+    def aprovacao_diretor(estado):
+        resposta = interrupt({"resumo": f"Risco ALTO. Parecer:\n{estado['parecer']}",
+                              "pergunta": "O diretor aprova o parecer? [sim/não]"})
+        return {"aprovado": resposta["aprovado"]}
+
+    def finalizar(estado):
+        return {"status": "aprovada"}
+
+    def encerrar(estado):
+        return {"status": "limite_de_revisoes"}
+
+    def negar(estado):
+        return {"status": "negada_pelo_diretor"}
+
+    def rotear_apos_gestor(estado):
+        if not estado["aprovado"]:
+            return "desistir" if estado["tentativas"] >= MAX_TENTATIVAS else "revisar"
+        return "finalizar" if estado["nivel_risco"] == "baixo" else "diretor"
+
+    def rotear_apos_diretor(estado):
+        return "finalizar" if estado["aprovado"] else "negar"
+
+    g = StateGraph(Estado)
+    for nome, funcao in [
+        ("receber", receber), ("investigar", investigar), ("juridico", juridico), ("risco", risco),
+        ("consolidar", consolidar), ("aprovacao_gestor", aprovacao_gestor), ("revisar", revisar),
+        ("aprovacao_diretor", aprovacao_diretor), ("finalizar", finalizar), ("encerrar", encerrar),
+        ("negar", negar),
+    ]:
+        g.add_node(nome, funcao)
+
+    g.add_edge(START, "receber")
+    g.add_edge("receber", "investigar")
+    g.add_edge("investigar", "juridico")   # fan-out: dois add_edge saindo do mesmo nó
+    g.add_edge("investigar", "risco")
+    g.add_edge(["juridico", "risco"], "consolidar")  # fan-in: espera os dois
+    g.add_edge("consolidar", "aprovacao_gestor")
+    g.add_conditional_edges("aprovacao_gestor", rotear_apos_gestor,
+                            {"diretor": "aprovacao_diretor", "finalizar": "finalizar",
+                             "revisar": "revisar", "desistir": "encerrar"})
+    g.add_edge("revisar", "consolidar")  # o ciclo
+    g.add_conditional_edges("aprovacao_diretor", rotear_apos_diretor,
+                            {"finalizar": "finalizar", "negar": "negar"})
+    g.add_edge("finalizar", END)
+    g.add_edge("encerrar", END)
+    g.add_edge("negar", END)
+    return g.compile(checkpointer=checkpointer)
 
 
 def executar(app, solicitacao: str, decisoes: list[str] | None = None, thread_id: str = "caso") -> tuple[dict, list[str]]:
@@ -109,10 +201,9 @@ CASOS = [
 if __name__ == "__main__":
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
     from langgraph.checkpoint.memory import MemorySaver
-    from caso import DENUNCIA_045, DENUNCIA_BAIXO_VALOR  # noqa: F401
-    from provedor import obter_modelo
+    from provedor import configurar
 
-    modelo = obter_modelo()  # LLM REAL: PROVEDOR no .env (openai ou ollama)
+    print(f"Modelo em uso: {configurar()}\n")  # LLM REAL: PROVEDOR no .env (openai ou ollama)
     for i, (titulo, texto, decisoes) in enumerate(CASOS):
-        estado, caminho = executar(construir_grafo(modelo, MemorySaver()), texto, decisoes, f"caso-{i}")
+        estado, caminho = executar(construir_grafo(MemorySaver()), texto, decisoes, f"caso-{i}")
         print(f"{titulo}\n  caminho: {' -> '.join(caminho)}\n  status={estado['status']} versões={estado['tentativas']}\n")

@@ -45,15 +45,17 @@ from typing import TypedDict
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
+from agents import Runner
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import Command, interrupt
 
+import agentes
 import prompts
 from caso import DENUNCIA_045
-from provedor import obter_modelo
+from provedor import configurar
 
-modelo = obter_modelo()  # LLM REAL: PROVEDOR no .env (openai ou ollama)
+MODELO = configurar()  # LLM REAL: PROVEDOR no .env (openai ou ollama)
 
 DB = Path(__file__).resolve().parent / "checkpoints.db"
 CONFIG = {"configurable": {"thread_id": "denuncia-045"}}
@@ -76,20 +78,20 @@ def orquestrador(estado: Estado) -> dict:
 
 def investigador(estado: Estado) -> dict:
     print("[INVESTIGADOR]")
-    return {"investigacao": modelo.gerar(prompts.investigar(estado["solicitacao"]))}
+    return {"investigacao": Runner.run_sync(agentes.investigador, estado["solicitacao"]).final_output}
 
 
 def juridico(estado: Estado) -> dict:
     print("[JURÍDICO]")
-    return {"analise_juridica": modelo.gerar(prompts.juridico(estado["investigacao"]))}
+    return {"analise_juridica": Runner.run_sync(agentes.juridico, estado["investigacao"]).final_output}
 
 
 def analista(estado: Estado) -> dict:
     print("[ANALISTA]")
     fatos, enquadramento = estado["investigacao"], estado["analise_juridica"]
-    risco = modelo.gerar(prompts.risco(fatos, enquadramento))
-    # A 1ª versão é um RASCUNHO curto (prompts.recomendar): um humano atento vai querer avaliá-la.
-    recomendacao = modelo.gerar(prompts.recomendar(fatos, enquadramento, risco))
+    risco = Runner.run_sync(agentes.risco, prompts.entrada_risco(fatos, enquadramento)).final_output
+    # A 1ª versão é um RASCUNHO curto (agentes.redator): um humano atento vai querer avaliá-la.
+    recomendacao = Runner.run_sync(agentes.redator, prompts.entrada_recomendar(fatos, enquadramento, risco)).final_output
     return {"analise_risco": risco, "recomendacao": recomendacao}
 
 
@@ -179,7 +181,7 @@ def parte_a_simples() -> None:
 
 
 if __name__ == "__main__":
-    print(f"Modelo em uso: {modelo.nome}\n")
+    print(f"Modelo em uso: {MODELO}\n")
     argumentos = sys.argv[1:]
     if "--simples" in argumentos:
         parte_a_simples()

@@ -22,6 +22,7 @@ Como o estado está no arquivo .db, dá para retomar em OUTRO processo:
     python exemplos\\04_persistencia\\main.py --auto        # tudo no mesmo processo (demonstração rápida)
 
 O foco NÃO é banco de dados: é  estado -> checkpoint -> persistência -> retomada.
+Os nós rodam os agentes de agentes.py (Agent + Runner), como no exemplo 03.
 """
 import sys
 from pathlib import Path
@@ -29,14 +30,16 @@ from typing import TypedDict
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
+from agents import Runner
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import END, START, StateGraph
 
+import agentes
 import prompts
 from caso import DENUNCIA_045
-from provedor import obter_modelo
+from provedor import configurar
 
-modelo = obter_modelo()  # LLM REAL: PROVEDOR no .env (openai ou ollama)
+MODELO = configurar()  # LLM REAL: PROVEDOR no .env (openai ou ollama)
 
 DB = Path(__file__).resolve().parent / "checkpoints.db"
 THREAD_ID = "denuncia-045"
@@ -53,19 +56,20 @@ class Estado(TypedDict):
 
 def investigador(estado: Estado) -> dict:
     print("[INVESTIGADOR]")
-    return {"investigacao": modelo.gerar(prompts.investigar(estado["solicitacao"]))}
+    return {"investigacao": Runner.run_sync(agentes.investigador, estado["solicitacao"]).final_output}
 
 
 def juridico(estado: Estado) -> dict:
     print("[JURÍDICO]")
-    return {"analise_juridica": modelo.gerar(prompts.juridico(estado["investigacao"]))}
+    return {"analise_juridica": Runner.run_sync(agentes.juridico, estado["investigacao"]).final_output}
 
 
 def analista(estado: Estado) -> dict:
     print("[ANALISTA]")
     fatos, enquadramento = estado["investigacao"], estado["analise_juridica"]
-    risco = modelo.gerar(prompts.risco(fatos, enquadramento))
-    return {"analise_risco": risco, "recomendacao": modelo.gerar(prompts.recomendar(fatos, enquadramento, risco))}
+    risco = Runner.run_sync(agentes.risco, prompts.entrada_risco(fatos, enquadramento)).final_output
+    recomendacao = Runner.run_sync(agentes.redator, prompts.entrada_recomendar(fatos, enquadramento, risco)).final_output
+    return {"analise_risco": risco, "recomendacao": recomendacao}
 
 
 def construir(checkpointer):
@@ -113,7 +117,7 @@ def historico(app) -> None:
 
 
 if __name__ == "__main__":
-    print(f"Modelo em uso: {modelo.nome}\n")
+    print(f"Modelo em uso: {MODELO}\n")
     argumentos = sys.argv[1:]
     if not argumentos or "--auto" in argumentos:
         DB.unlink(missing_ok=True)  # demonstração limpa: recomeça o banco

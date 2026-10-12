@@ -1,5 +1,5 @@
 """
-Desafio da Aula 7 -- esqueleto. Implemente construir_grafo(); o resto já vem pronto.
+Desafio da Aula 7 -- parecer com aprovação humana condicionada ao risco.
 
 Rodar, a partir de aula7/:
     python desafio\main.py
@@ -11,10 +11,12 @@ from typing import TypedDict
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from langgraph.graph import END, START, StateGraph
+from agents import Runner  # noqa: F401  (roda os agentes: Runner.run_sync(agente, entrada).final_output)
+from langgraph.graph import END, START, StateGraph  # noqa: F401
 from langgraph.types import Command, interrupt  # noqa: F401
 
-import prompts  # noqa: F401  (os prompts dos especialistas)
+import agentes  # noqa: F401  (os agentes prontos: investigador, classificador, redator, ...)
+import prompts  # noqa: F401  (entradas dos agentes e nivel_de)
 from caso import DENUNCIA_045, DENUNCIA_BAIXO_VALOR
 
 MAX_TENTATIVAS = 3
@@ -32,8 +34,8 @@ class Estado(TypedDict):
     status: str  # "aprovada" | "aprovada_automaticamente" | "limite_de_revisoes"
 
 
-def construir_grafo(modelo, checkpointer):
-    """TODO: monte o grafo (nós, roteadores e arestas) e devolva g.compile(checkpointer=checkpointer).
+def construir_grafo(checkpointer):
+    """Monta o grafo (nós, roteadores e arestas) e devolve g.compile(checkpointer=checkpointer).
 
     Nós (nomes exatos, os testes conferem o caminho):
         receber, investigar, avaliar_risco, recomendar, validacao_humana, revisar, finalizar, encerrar
@@ -62,24 +64,86 @@ def construir_grafo(modelo, checkpointer):
     Status final: finalizar -> "aprovada_automaticamente" (veio do risco baixo) ou "aprovada";
                   encerrar  -> "limite_de_revisoes".
 
-    Como chamar o LLM (REAL; os prompts já estão prontos em prompts.py):
-        investigar     -> modelo.gerar(prompts.investigar(estado["solicitacao"]))
-        avaliar_risco  -> texto = modelo.gerar(prompts.classificar_risco(estado["solicitacao"], estado["investigacao"]))
+    Como chamar os agentes (REAIS; já estão prontos em agentes.py, e as entradas em prompts.py):
+        investigar     -> Runner.run_sync(agentes.investigador, estado["solicitacao"]).final_output
+        avaliar_risco  -> entrada = prompts.entrada_classificar(estado["solicitacao"], estado["investigacao"])
+                          texto = Runner.run_sync(agentes.classificador, entrada).final_output
                           nivel_risco = prompts.nivel_de(texto)      # "alto" | "baixo"
-        recomendar     -> modelo.gerar(prompts.recomendar(estado["investigacao"], "", estado["nivel_risco"], estado["feedback_humano"]))
+        recomendar     -> entrada = prompts.entrada_recomendar(estado["investigacao"], "", estado["nivel_risco"],
+                                                               estado["feedback_humano"])
+                          Runner.run_sync(agentes.redator, entrada).final_output
 
     Veja o enunciado em README.md e o exemplo 07 da aula.
     """
     def receber(estado):
-        return {"solicitacao": estado["solicitacao"].strip(), "urgencia": "", "informacao": "",
-                "encaminhamento": "", "analise": "", "valida": False, "tentativas": 0,
-                "feedback": "", "resposta": ""}
+        return {"solicitacao": estado["solicitacao"].strip(), "investigacao": "", "nivel_risco": "",
+                "recomendacao": "", "aprovado": False, "feedback_humano": "", "tentativas": 0, "status": ""}
 
-    construtor = StateGraph(Estado)
-    construtor.add_node("receber", receber)
-    construtor.add_edge(START, "receber")
-    construtor.add_edge("receber", END)
-    return construtor.compile()
+    def investigar(estado):
+        return {"investigacao": Runner.run_sync(agentes.investigador, estado["solicitacao"]).final_output}
+
+    def avaliar_risco(estado):
+        entrada = prompts.entrada_classificar(estado["solicitacao"], estado["investigacao"])
+        texto = Runner.run_sync(agentes.classificador, entrada).final_output
+        return {"nivel_risco": prompts.nivel_de(texto)}
+
+    def recomendar(estado):
+        tentativa = estado["tentativas"] + 1
+        entrada = prompts.entrada_recomendar(estado["investigacao"], "", estado["nivel_risco"],
+                                             estado["feedback_humano"])
+        recomendacao = Runner.run_sync(agentes.redator, entrada).final_output
+        return {"recomendacao": recomendacao, "tentativas": tentativa}
+
+    def validacao_humana(estado):
+        linha = "=" * 60
+        resumo = (
+            f"{linha}\nANÁLISE PARA VALIDAÇÃO (versão {estado['tentativas']} de no máximo {MAX_TENTATIVAS})\n{linha}\n"
+            f"Investigação  : {estado['investigacao']}\n"
+            f"Nível de risco: {estado['nivel_risco']}\n"
+            f"Recomendação  : {estado['recomendacao']}\n{linha}"
+        )
+        resposta = interrupt({"resumo": resumo, "pergunta": "Aprovar análise? [sim/não]"})
+        return {"aprovado": resposta["aprovado"], "feedback_humano": resposta.get("feedback", "")}
+
+    def revisar(estado):
+        return {}
+
+    def finalizar(estado):
+        status = "aprovada_automaticamente" if estado["nivel_risco"] == "baixo" else "aprovada"
+        return {"status": status}
+
+    def encerrar(estado):
+        return {"status": "limite_de_revisoes"}
+
+    def rotear_apos_risco(estado):
+        return estado["nivel_risco"]
+
+    def rotear_apos_humano(estado):
+        if estado["aprovado"]:
+            return "aprovada"
+        if estado["tentativas"] >= MAX_TENTATIVAS:
+            return "desistir"
+        return "revisar"
+
+    g = StateGraph(Estado)
+    for nome, funcao in [
+        ("receber", receber), ("investigar", investigar), ("avaliar_risco", avaliar_risco),
+        ("recomendar", recomendar), ("validacao_humana", validacao_humana), ("revisar", revisar),
+        ("finalizar", finalizar), ("encerrar", encerrar),
+    ]:
+        g.add_node(nome, funcao)
+
+    g.add_edge(START, "receber")
+    g.add_edge("receber", "investigar")
+    g.add_edge("investigar", "avaliar_risco")
+    g.add_conditional_edges("avaliar_risco", rotear_apos_risco, {"baixo": "finalizar", "alto": "recomendar"})
+    g.add_edge("recomendar", "validacao_humana")
+    g.add_conditional_edges("validacao_humana", rotear_apos_humano,
+                            {"aprovada": "finalizar", "revisar": "revisar", "desistir": "encerrar"})
+    g.add_edge("revisar", "recomendar")
+    g.add_edge("finalizar", END)
+    g.add_edge("encerrar", END)
+    return g.compile(checkpointer=checkpointer)
 
 
 def executar(app, solicitacao: str, decisoes: list[str] | None = None, thread_id: str = "caso") -> tuple[dict, list[str]]:
@@ -113,10 +177,9 @@ CASOS = [
 if __name__ == "__main__":
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
     from langgraph.checkpoint.memory import MemorySaver
-    from caso import DENUNCIA_045, DENUNCIA_BAIXO_VALOR  # noqa: F401
-    from provedor import obter_modelo
+    from provedor import configurar
 
-    modelo = obter_modelo()  # LLM REAL: PROVEDOR no .env (openai ou ollama)
+    print(f"Modelo em uso: {configurar()}\n")  # LLM REAL: PROVEDOR no .env (openai ou ollama)
     for i, (titulo, texto, decisoes) in enumerate(CASOS):
-        estado, caminho = executar(construir_grafo(modelo, MemorySaver()), texto, decisoes, f"caso-{i}")
+        estado, caminho = executar(construir_grafo(MemorySaver()), texto, decisoes, f"caso-{i}")
         print(f"{titulo}\n  caminho: {' -> '.join(caminho)}\n  status={estado['status']} versões={estado['tentativas']}\n")
