@@ -19,15 +19,16 @@ from carregar_grafo import carregar_app
 exemplo = sys.argv[1] if len(sys.argv) > 1 else "10_agente_completo"
 
 # TODO 1: carregue o grafo compilado do exemplo (use carregar_app).
-app = None
+app = carregar_app(exemplo)
 
 # TODO 2: peça ao LangGraph o Mermaid do grafo (dica: app.get_graph().draw_mermaid()).
-mermaid = ""
+mermaid = app.get_graph().draw_mermaid()
 
 pasta_saida = Path(__file__).resolve().parent / "saida"
 pasta_saida.mkdir(exist_ok=True)
 
 # TODO 3: salve `mermaid` em saida/<exemplo>.mmd  (Path.write_text, encoding="utf-8").
+(pasta_saida / f"{exemplo}.mmd").write_text(mermaid, encoding="utf-8")
 
 # TODO 4: salve em saida/<exemplo>.md um título e o Mermaid dentro de um bloco de código:
 #         # <exemplo>
@@ -35,6 +36,8 @@ pasta_saida.mkdir(exist_ok=True)
 #         ```mermaid
 #         ...aqui o Mermaid...
 #         ```
+conteudo_md = f"# {exemplo}\n\n```mermaid\n{mermaid}\n```\n"
+(pasta_saida / f"{exemplo}.md").write_text(conteudo_md, encoding="utf-8")
 
 print(mermaid)
 print(f"\nSalvo em saida/{exemplo}.mmd e saida/{exemplo}.md")

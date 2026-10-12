@@ -12,6 +12,7 @@ Tools a implementar (leia o README.md, passo 3):
 Testar SEM Claude:
     python cliente_teste.py
     python cliente_teste.py mermaid_do_grafo 07_dag
+    python cliente_teste.py descrever_grafo 07_dag
 
 REGRA DE OURO de um servidor stdio: NUNCA use print() aqui. O stdout é o canal do protocolo MCP;
 um print estraga a conversa (para depurar, use print(..., file=sys.stderr)).
@@ -33,7 +34,7 @@ mcp = MCPServer("grafos-mcp")
 def listar_exemplos() -> list[str]:
     """Lista os exemplos da Aula 6 cujo grafo pode ser consultado."""
     # TODO 1: devolva a lista de exemplos (já importada acima).
-    raise NotImplementedError("TODO 1")
+    return EXEMPLOS
 
 
 @mcp.tool()
@@ -46,7 +47,11 @@ def mermaid_do_grafo(exemplo: str) -> str:
     # TODO 2: carregue o app do exemplo e devolva o Mermaid (como no passo 1).
     #         Se o nome não existir, carregar_app levanta ValueError: devolva "ERRO: <mensagem>"
     #         em vez de deixar o servidor quebrar.
-    raise NotImplementedError("TODO 2")
+    try:
+        app = carregar_app(exemplo)
+        return app.get_graph().draw_mermaid()
+    except ValueError as erro:
+        return f"ERRO: {erro}"
 
 
 @mcp.tool()
@@ -62,7 +67,23 @@ def descrever_grafo(exemplo: str) -> dict:
     #    "arestas": [{"origem": a.source, "destino": a.target, "condicional": bool(a.conditional)}
     #                for a in grafo.edges]}
     #   Exemplo desconhecido: devolva {"erro": "<mensagem>"}.
-    raise NotImplementedError("TODO 3")
+    try:
+        app = carregar_app(exemplo)
+        grafo = app.get_graph()
+        return {
+            "exemplo": exemplo,
+            "nos": list(grafo.nodes),
+            "arestas": [
+                {
+                    "origem": a.source,
+                    "destino": a.target,
+                    "condicional": bool(a.conditional),
+                }
+                for a in grafo.edges
+            ],
+        }
+    except ValueError as erro:
+        return {"erro": str(erro)}
 
 
 if __name__ == "__main__":
