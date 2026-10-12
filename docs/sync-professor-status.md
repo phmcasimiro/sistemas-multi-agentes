@@ -27,7 +27,7 @@ Este documento registra as decisões de mescla, classificação de arquivos e va
 | `.env.example` | [MESCLADO] | Adicionar variáveis para Claude/Anthropic e modo Mock nas Aulas 6/7. |
 | `provedor.py` (raiz) | [LOCAL] | Manter a abstração multi-provedor (Zen/Ollama/OpenAI) com fallback automático e documentação aprofundada. |
 | `aula6/provedor.py` | [PROFESSOR] | Mantido isolado para a Aula 6 (fornece contrato `Modelo` para Grafos e LangGraph com mock offline). |
-| `aula7/provedor.py` | [PROFESSOR] | Mantido isolado para a Aula 7 (fornece contrato `Modelo` para Grafos e LangGraph). |
+| `aula7/provedor.py` | [PROFESSOR] | Atualizado para a nova arquitetura (SDK `openai-agents`): expõe `configurar()` e usa `Agent`/`Runner` (versão de 06/10 do professor). |
 
 ---
 
@@ -96,10 +96,10 @@ Este documento registra as decisões de mescla, classificação de arquivos e va
 ### Aula 7 (Nova)
 | Componente | Status | Decisão / Observações |
 |---|---|---|
-| `aula-07.md`, `README.md` | [PROFESSOR] | Teoria de orquestração multiagente com LangGraph. |
-| `agentes.py`, `caso.py`, `prompts.py` | [PROFESSOR] | Agentes especialistas em segurança pública e regras de negócio. |
-| `exemplos/01_` a `08_` | [PROFESSOR] | Generalista, Especializado, Estado, Persistência, Equipe, HITL. |
-| `desafio`, `desafio2` | [PROFESSOR] | Casos práticos com testes de validação automatizados. |
+| `aula-07.md`, `README.md`, `requirements.txt`, `.env.example` | [PROFESSOR] | Teoria de orquestração multiagente com LangGraph; nova arquitetura `Agent`+`Runner` (openai-agents). |
+| `agentes.py`, `caso.py`, `prompts.py` | [PROFESSOR] | Agentes especialistas; `prompts.INSTR_*` + entradas; `provedor.configurar()`. |
+| `exemplos/01_` a `08_` | [MESCLADO] | Infraestrutura/esqueletos do professor + implementação local portada para a nova arquitetura. |
+| `desafio`, `desafio2` | [MESCLADO] | `construir_grafo()` implementado localmente conforme especificação do professor; testes oficiais mantidos. |
 
 ---
 
@@ -133,5 +133,8 @@ Este documento registra as decisões de mescla, classificação de arquivos e va
   - Exemplos conceituais e grafos lineares/condicionais validados.
 - [x] **Validação de execução Aula 7**:
   - Estrutura multiagente LangGraph, checkpoints SQLite e HITL validados.
+  - `compileall`: todos os arquivos de `aula7/` compilam (2 `SyntaxWarning` de escape `\` herdados dos docstrings do professor).
+  - Testes oficiais do professor (`desafio/test_desafio.py` e `desafio2/test_desafio2.py`): **10 de 10 passaram** com o `Runner` simulado offline (sem chamar LLM real).
+  - `langgraph-checkpoint-sqlite` instalado no `venv` (nova dependência do `requirements.txt` do professor).
   - Scripts configurados para rodar tanto com OpenAI quanto Ollama local.
 

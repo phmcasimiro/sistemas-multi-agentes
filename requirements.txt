@@ -67,3 +67,25 @@ anthropic>=1.8,<2.0
 langsmith>=0.14,<1.0
 mcp>=2.0
 openai>=2.0
+# Agentes (Agent + Runner) e cliente que também fala com o Ollama
+# Aula 9 (pasta aula8) -- Auto-scaling, Observabilidade e Segurança de Agentes
+# (bug do typing corrigido na 3.11.1). nemoguardrails exige Python < 3.14.
+# Grafo (só a partir do exemplo de LangGraph)
+# Guardrails de entrada/saída
+httpx>=0.28
+# Instale com:  python -m pip install -r requirements.txt
+langfuse>=4.17,<5.0
+# Langfuse v4 (observabilidade de LLM, construída sobre OpenTelemetry)
+# Métricas (endpoint /metrics para o Prometheus)
+nemoguardrails>=0.24,<1.0
+openai>=3.0,<4.0
+openai-agents>=0.23,<1.0
+opentelemetry-api>=1.45,<2.0
+# OpenTelemetry: API + SDK + exportador OTLP/HTTP (é o que o Langfuse recebe)
+opentelemetry-exporter-otlp-proto-http>=1.45,<2.0
+opentelemetry-sdk>=1.45,<2.0
+prometheus-client>=0.26,<1.0
+pytest>=9.0
+# Testado com Python 3.10 (a mesma da aula7). NÃO use Python 3.11.0: o openai-agents não importa nele
+# Todos os exemplos usam LLM REAL (OpenAI ou Ollama), sem Mock.
+# Utilitários

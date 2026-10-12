@@ -1,199 +1,227 @@
 # Aula 7 — Sistemas Multiagentes, Persistência e Human-in-the-Loop
 
-Cenário único da aula: uma **equipe de agentes que analisa uma denúncia sobre uma
-contratação pública** (Pregão 045/2026, dados fictícios). Todos os exemplos são
-**evoluções do mesmo caso**: começa com um agente que faz tudo e termina com uma
-equipe de especialistas, com estado salvo em disco e um **humano que aprova ou
-manda revisar** antes de a recomendação valer.
+Cenário único da aula: uma **equipe especializada de agentes de inteligência fiscalizatória e auditoria** analisando denúncias sobre contratações públicas suspeitas (caso de estudo: *Pregão 045/2026*).
+O sistema evolui de um agente generalista opaco para uma equipe colaborativa orientada a papéis, com estado gravado em banco de dados e **aprovação humana mandatória (Human-in-the-Loop)** em pontos críticos de decisão.
 
-> **Ideia central:** agentes especializados colaboram por meio de um **estado
-> compartilhado**; o estado é **persistido** (checkpoint) para poder ser retomado;
-> e, nos pontos críticos, **o humano decide**.
+> **Tese Central:** Em ambientes corporativos e governamentais de alta criticidade, agentes autônomos não devem tomar decisões finais isoladamente. A arquitetura deve combinar **especialistas cooperativos**, **persistência de estado em checkpoints auditáveis** e **pausa assíncrona para intervenção e validação humana**.
 
-O conteúdo teórico está em [`aula-07.md`](aula-07.md).
+---
 
-## Objetivos
+## 1. Referencial Teórico Aprofundado
 
-Ao final da aula você será capaz de:
+### 1.1 A Falência do Agente Generalista vs. Equipes de Especialistas
+Ao utilizar um único agente monolítico para analisar uma denúncia completa:
+- O agente mistura apuração de fatos empíricos, tipificação jurídica, cálculo de matriz de risco e recomendações punitivas.
+- As saídas tornam-se prolixas, imprecisas e propensas a alucinações ("confabulações fáticas").
+- Torna-se inviável atribuir responsabilidade ou testar isoladamente a conformidade jurídica sem reexecutar todo o processo.
 
-- explicar por que um agente generalista não escala e como **especialistas** resolvem isso;
-- distinguir **estado** (a execução atual) de **memória** (o que sobrevive entre execuções);
-- persistir a execução com **checkpointer** (SQLite) e retomá-la com `thread_id`, até em outro processo;
-- montar uma **equipe multiagente** como grafo, com um orquestrador, e **paralelizar** especialistas independentes;
-- pausar o grafo com `interrupt()` e retomá-lo com `Command(resume=...)`;
-- modelar **aprovação e revisão** com limite de tentativas;
-- separar **erro técnico** (retomar) de **rejeição humana** (revisar).
+**A Solução Multiagente Baseada em Especialistas:**
+Cada agente atua sob o **Princípio da Responsabilidade Única (SRP)**:
+1. **Agente Investigador:** Extrai exclusivamente fatos objetivos, datas, CNPJs e valores contidos na denúncia. Não emite juízo de valor.
+2. **Agente Jurídico:** Recebe os fatos apurados e aplica a legislação pertinente (ex.: Lei 14.133/21, Lei 8.666/93).
+3. **Agente de Risco:** Avalia a materialidade, relevância e impacto financeiro.
+4. **Agente Relator/Analista:** Consolida os pareceres em uma minuta conclusiva de encaminhamento.
 
-## Pré-requisitos
+### 1.2 Estado de Execução vs. Memória de Longo Prazo
 
-- **Python 3.10 ou mais novo**; Aulas 1–6 (principalmente a 6: `StateGraph`, arestas condicionais e ciclos).
-- **LLM real em tudo**: exemplos, exercícios e desafios chamam um modelo de verdade. Você precisa de **uma** destas opções: `OPENAI_API_KEY` (padrão, como nas Aulas 4 e 5) **ou** um **Ollama** local (grátis). Não há Mock.
-- Sem Docker e sem banco externo (a persistência usa um arquivo SQLite local).
-
-## Instalação
-
-```powershell
-git clone https://github.com/franciscomduarte/material-pcdf.git
-cd material-pcdf\aula7
-python -m venv .venv
-.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-```
-
-> Se o PowerShell bloquear a ativação, rode uma vez: `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`.
-> No `cmd`: `.venv\Scripts\activate.bat`. Em Linux/Mac: `source .venv/bin/activate`.
-
-```powershell
-python -c "import langgraph; print('langgraph OK')"
-```
-
-## Execução
-
-Rode **sempre a partir da pasta `aula7/`**:
-
-```powershell
-python exemplos\01_agente_generalista\main.py
-python exemplos\07_aprovacao_revisao\main.py
-```
-
-Os exemplos 01–03 não usam LangGraph (só o LLM).
-
-## Exemplos — uma única evolução
-
-```
-01_agente_generalista     O problema: um agente faz tudo, e não dá para saber quem fez o quê
-        ↓
-02_agentes_especializados Investigador, Jurídico e Analista: cada um faz UMA coisa
-        ↓
-03_estado_compartilhado   Um TypedDict que todos leem/escrevem; ESTADO x MEMÓRIA
-        ↓
-04_persistencia           LangGraph + SQLite: checkpoint, thread_id, retomar em outro processo
-        ↓
-05_equipe_multiagente     Especialistas como nós de um grafo, com orquestrador
-        ↓
-06_human_in_the_loop      interrupt() e Command(resume=...): o humano decide no meio do fluxo
-        ↓
-07_aprovacao_revisao      Rejeição com feedback, ciclo de revisão limitado, erro técnico x rejeição
-        ↓
-08_paralelismo            Jurídico e Risco em paralelo (fan-out/fan-in), com medição de tempo
-        ↓
-desafio                   Você implementa: parecer com aprovação humana condicionada ao risco
-desafio2                  Você implementa: especialistas em paralelo + aprovação em dois níveis
-```
-
-Cada pasta de exemplo tem um **`exercicio.md`** para você fazer sozinho: copie o `main.py` para
-`exercicio.py` e resolva lá, sem mexer no original.
-
-### Comandos úteis de cada exemplo
-
-| Exemplo | Comando | O que mostra |
+| Dimensão | Estado de Execução (*State*) | Memória de Longo Prazo (*Memory*) |
 |---|---|---|
-| 04 | `python exemplos\04_persistencia\main.py` | roda até o breakpoint e **encerra** o processo |
-| 04 | `... --retomar` | **outro** processo lê o checkpoint e continua |
-| 04 | `... --historico` | lista os checkpoints da execução |
-| 06 | `python exemplos\06_human_in_the_loop\main.py --simples` | a versão ingênua, com `input()` |
-| 06 | `python exemplos\06_human_in_the_loop\main.py` | pausa com `interrupt()` e encerra |
-| 06 | `... --retomar sim` | outro processo retoma com a decisão |
-| 07 | `python exemplos\07_aprovacao_revisao\main.py` | interativo: **você** é o humano |
-| 07 | `... --auto nao,sim` | rejeita 1x, depois aprova |
-| 07 | `... --auto nao,nao,nao` | rejeita até o limite de 3 versões |
-| 07 | `... --falha-tecnica` e depois `... --retomar --auto sim` | erro técnico: retoma sem contar tentativa |
-| 08 | `python exemplos8_paralelismo\main.py` | mesmo trabalho em fila (~2 s) e em paralelo (~1 s) |
+| **Definição** | Rascunho computacional ativo da execução corrente. | Base de conhecimento e histórico acumulado entre sessões. |
+| **Tempo de Vida** | Vinculado ao ciclo de vida da transação ou `thread_id`. | Permanente em banco vetorial, relacional ou grafo de conhecimento. |
+| **Conteúdo** | `denuncia`, `fatos`, `parecer_juridico`, `tentativas`. | Padrões de fraudes anteriores, jurisprudência de tribunais de contas. |
+| **Analogia** | A pasta do processo aberta sobre a mesa do auditor. | O arquivo geral e a biblioteca jurídica do órgão. |
 
-Estrutura de diretórios:
+### 1.3 Teoria da Persistência e Checkpointers
+Sistemas do mundo real não podem depender de memória volátil (RAM):
+- Um parecer pode aguardar a assinatura de um gestor por **horas ou semanas**.
+- Se o servidor reiniciar ou sofrer manutenção, a esteira não pode perder o progresso nem cobrar o modelo novamente.
+- **Mecanismo de Checkpointing:** O `SqliteSaver` tira um snapshot criptografado/estruturado do estado após cada nó do grafo. Cada execução possui uma chave primária chamada `thread_id`.
+- **Retomada Desacoplada (Inter-Processo):** O processo $A$ executa os nós automáticos e encerra. Dias depois, um processo $B$ (ex.: uma API FastAPI disparada pelo clique de um auditor em um portal web) invoca o grafo com o mesmo `thread_id` e restaura o fluxo exatamente de onde parou.
 
+### 1.4 Human-in-the-Loop (HITL): `input()` vs. `interrupt()`
+- **A Abordagem Ingênua (`input()`):** Bloqueia a thread do sistema operacional, impede a liberação de recursos, morre em reinicializações e é inviável em arquiteturas web distribuídas.
+- **A Abordagem Robusta (`interrupt()` do LangGraph):**
+  1. O nó executa e aciona `interrupt(pergunta)`.
+  2. O LangGraph serializa o estado, grava o checkpoint no SQLite e **retorna a execução** para o chamador com uma estrutura especial `__interrupt__`.
+  3. O processo Python é finalizado de forma limpa.
+  4. Quando o humano decide, o sistema faz `invoke(Command(resume=resposta), config={"configurable": {"thread_id": id}})`.
+  5. **Atenção à Idempotência:** Ao ser retomado, o nó que continha o `interrupt()` roda novamente desde o início. Portanto, ações de efeito colateral irreversível (ex.: envio de intimação ou débito em conta) **nunca** devem anteceder a chamada de interrupção.
+
+### 1.5 Taxonomia das Paradas: Erro Técnico vs. Rejeição Humana
+
+```mermaid
+flowchart TD
+    Falha{Tipo de Falha?}
+    Falha -->|Técnica: API caiu, Timeout, 500| ErroTecnico[🔧 Erro de Infraestrutura]
+    Falha -->|Negócio: Parecer vago, falta fundamentação| RejeicaoHumana[⚖️ Rejeição de Negócio]
+    
+    ErroTecnico --> AcaoTecnica[Retomar via invoke com mesmo estado sem queimar tentativas]
+    RejeicaoHumana --> AcaoNegocio[Incrementar tentativas, anexar feedback e retornar ao Analista]
 ```
+
+---
+
+## 2. Esquemas de Arquitetura
+
+### 2.1 Concorrência e Paralelismo: Fan-Out / Fan-In (`08_paralelismo`)
+Quando duas análises dependem apenas dos fatos apurados pelo Investigador, elas podem rodar concorrentemente, reduzindo a latência total do sistema:
+
+```mermaid
+flowchart TD
+    START([START]) --> Investigador[🕵️ Agente Investigador<br/>Extração dos Fatos]
+    
+    subgraph Paralelismo ["⚡ Concorrência (Fan-Out)"]
+        Investigador --> Juridico[⚖️ Agente Jurídico<br/>Enquadramento Legal]
+        Investigador --> Risco[📊 Agente de Risco<br/>Matriz de Probabilidade x Impacto]
+    end
+    
+    subgraph Sincronizacao ["🧩 Junção (Fan-In)"]
+        Juridico --> Consolidar[📝 Agente Relator<br/>Consolidação da Minuta]
+        Risco --> Consolidar
+    end
+
+    Consolidar --> END([END])
+
+    style Investigador fill:#e1f5fe,stroke:#0288d1,stroke-width:2px;
+    style Juridico fill:#ede7f6,stroke:#512da8,stroke-width:2px;
+    style Risco fill:#fff3e0,stroke:#f57c00,stroke-width:2px;
+    style Consolidar fill:#e8f5e9,stroke:#388e3c,stroke-width:2px;
+```
+
+### 2.2 Máquina de Estados de Revisão e Human-in-the-Loop (`07_aprovacao_revisao`)
+Fluxo completo com persistência SQLite, interrupção e ciclo limitado de revisão com feedback humano:
+
+```mermaid
+flowchart TD
+    START([START]) --> Apurar[🕵️ Investigar & Analisar]
+    Apurar --> Minuta[📝 Gerar Minuta de Parecer]
+    Minuta --> Checkpoint[💾 Gravar Checkpoint no SQLite]
+    Checkpoint --> Pausa{⏸️ interrupt: Decisão Humana}
+    
+    Pausa -->|Command: APROVADO| Publicar[✅ Publicar Parecer Oficial]
+    Pausa -->|Command: REJEITADO & tent < 3| Feedback[🔄 Analista refaz com feedback_humano]
+    Pausa -->|Command: REJEITADO & tent >= 3| Esgotado[🚨 Encaminhar para Corregedoria]
+    
+    Feedback --> Minuta
+    Publicar --> END([END])
+    Esgotado --> END
+
+    style Checkpoint fill:#e0f2f1,stroke:#00796b,stroke-width:2px;
+    style Pausa fill:#fffde7,stroke:#fbc02d,stroke-width:2px;
+    style Publicar fill:#e8f5e9,stroke:#388e3c,stroke-width:2px;
+    style Esgotado fill:#ffebee,stroke:#d32f2f,stroke-width:2px;
+```
+
+### 2.3 Aprovação em Dois Níveis (`desafio2`)
+Arquitetura onde o Gestor sempre revisa a denúncia, mas o Diretor Geral é acionado dinamicamente apenas se o nível de risco ultrapassar o limiar crítico:
+
+```mermaid
+flowchart TD
+    Inicio([START]) --> Triagem[Investigação dos Fatos]
+    Triagem --> AnalisesParalelas[⚖️ Jurídico + 📊 Risco em Paralelo]
+    AnalisesParalelas --> Consolidacao[Elaboração do Parecer]
+    
+    Consolidacao --> AprovGestor{👤 1º Nível: Gestor Aprova?}
+    AprovGestor -->|Não| RevisarAnalise[Refazer Parecer com Apontamentos]
+    RevisarAnalise --> Consolidacao
+    
+    AprovGestor -->|Sim| AvaliarRisco{Nível de Risco?}
+    AvaliarRisco -->|Baixo ou Médio| Concluir[✅ Homologação Concluída]
+    AvaliarRisco -->|Alto ou Crítico| AprovDiretor{👔 2º Nível: Diretor Aprova?}
+    
+    AprovDiretor -->|Sim| Concluir
+    AprovDiretor -->|Não| RevisarAnalise
+
+    Concluir --> Fim([END])
+
+    style AprovGestor fill:#fff3e0,stroke:#f57c00,stroke-width:2px;
+    style AprovDiretor fill:#fce4ec,stroke:#c2185b,stroke-width:2px;
+    style Concluir fill:#e8f5e9,stroke:#388e3c,stroke-width:2px;
+```
+
+---
+
+## 3. Estrutura de Diretórios da Aula 7
+
+```text
 aula7/
-├── README.md            # este arquivo
-├── aula-07.md           # material teórico
-├── provedor.py          # escolhe o LLM (PROVEDOR no .env)
-├── caso.py              # as denúncias (dados fictícios, com os fatos no texto)
-├── prompts.py           # os prompts dos especialistas (prontos)
-├── .env.example
-├── requirements.txt
-├── exemplos/            # 01..08, cada um com exercicio.md
-├── desafio/             # enunciado, esqueleto e testes
-└── desafio2/            # idem: paralelo + aprovação em dois níveis
+├── README.md               # Este guia completo de sistemas multiagentes, persistência e HITL
+├── aula-07.md              # Material didático de perguntas e respostas teóricas
+├── provedor.py             # Configuração do SDK de agentes (OpenAI ou Ollama)
+├── agentes.py              # Definição modular dos especialistas (Investigador, Jurídico, etc.)
+├── caso.py                 # Conjunto de denúncias fictícias com fatos verificáveis
+├── prompts.py              # Prompts instrucionais estritos de cada especialista
+├── requirements.txt        # Dependências (langgraph, langgraph-checkpoint-sqlite, openai-agents)
+├── .env.example            # Template de configuração
+├── exemplos/               # Progressão em 8 etapas práticas
+│   ├── 01_agente_generalista/ # Limitações do agente monolítico
+│   ├── 02_agentes_especializados/ # Separação dos agentes por responsabilidade
+│   ├── 03_estado_compartilhado/ # Contrato TypedDict e distinção entre Estado e Memória
+│   ├── 04_persistencia/    # SqliteSaver, thread_id e retomada entre processos distintos
+│   ├── 05_equipe_multiagente/ # Orquestração da equipe através de nós do LangGraph
+│   ├── 06_human_in_the_loop/ # Pausa com interrupt() e retomada via Command(resume=...)
+│   ├── 07_aprovacao_revisao/ # Ciclo de rejeição com feedback, limite de loops e erro técnico
+│   └── 08_paralelismo/     # Execução concorrente Fan-Out / Fan-In e medição de tempo
+├── desafio/                # Desafio 1: Parecer com aprovação condicionada ao nível de risco
+└── desafio2/               # Desafio 2: Análises em paralelo + aprovação escalonada em dois níveis
 ```
 
-## Conceitos-chave no LangGraph
+---
 
-| Conceito | Significado |
-|---|---|
-| `compile(checkpointer=SqliteSaver(...))` | salva o estado a cada passo |
-| `config = {"configurable": {"thread_id": "..."}}` | identifica a execução; mesma id = mesma execução |
-| `app.get_state(config)` | lê o estado salvo e o `next` (próximo nó pendente) |
-| `interrupt_before=["no"]` | breakpoint **estático**: para antes do nó, sempre |
-| `interrupt(valor)` | pausa **dentro** do nó e devolve `valor` ao chamador (`"__interrupt__"`) |
-| `Command(resume=X)` | retoma do checkpoint; `interrupt()` devolve `X` |
-| `invoke(None, config)` | retoma um checkpoint sem resposta (ex.: depois de um erro técnico) |
+## 4. Catálogo dos Exemplos e Comandos
 
-> **Atenção:** ao retomar, o nó que chamou `interrupt()` roda **de novo desde o início**.
-> Por isso nada com efeito colateral (enviar e-mail, gravar, cobrar) vem antes do `interrupt()`.
+| Exemplo | O que demonstra | Comando Principal | Opções de Demonstração |
+|---|---|---|---|
+| **01** | Agente monolítico opaco | `python exemplos/01_agente_generalista/main.py` | Execução direta sem especialização |
+| **02** | Especialistas sequenciais | `python exemplos/02_agentes_especializados/main.py` | Saídas independentes para cada papel |
+| **03** | Estado compartilhado | `python exemplos/03_estado_compartilhado/main.py` | Inspeciona preenchimento incremental do `TypedDict` |
+| **04** | Persistência com SQLite | `python exemplos/04_persistencia/main.py` | `--retomar` (retoma noutro processo)<br/>`--historico` (inspeciona checkpoints)<br/>`--auto` (execução completa contínua) |
+| **05** | Grafo multiagente | `python exemplos/05_equipe_multiagente/main.py` | Exibe o log estruturado `[nó]` passo a passo |
+| **06** | Pausa humana assíncrona | `python exemplos/06_human_in_the_loop/main.py` | `--simples` (modo `input()` síncrono)<br/>`--retomar sim` (outro processo responde)<br/>`--auto sim` (pausa e retoma localmente) |
+| **07** | Ciclo de aprovação/revisão | `python exemplos/07_aprovacao_revisao/main.py` | `--auto nao,sim` (rejeição com feedback e posterior aprovação)<br/>`--falha-tecnica` (simula erro de API sem queimar tentativas) |
+| **08** | Fan-out / Fan-in | `python exemplos/08_paralelismo/main.py` | Compara tempo em fila (~2s) vs paralelo (~1s) |
 
-## Provedores de LLM (todos REAIS)
+---
 
-Mesmo padrão das Aulas 4 e 5: a variável `PROVEDOR` (no `.env` ou no ambiente) escolhe o modelo em
-[`provedor.py`](provedor.py). **O grafo não muda**, só o provedor. **Não há Mock nesta aula.**
+## 5. Desafios Práticos
 
-| `PROVEDOR` | O que é | Precisa de |
-|---|---|---|
-| `openai` (padrão) | OpenAI (`gpt-4o-mini`) | `OPENAI_API_KEY` |
-| `ollama` | modelo local, grátis | `ollama serve` no ar + modelo baixado (`OLLAMA_MODEL`) |
-| `claude` | Anthropic (opcional) | `ANTHROPIC_API_KEY` |
-
-Configuração: `copy .env.example .env` e preencha só o que for usar. O `.env` está no `.gitignore`:
-**nunca coloque chaves no código nem faça commit delas.** Sem a chave (ou sem o Ollama no ar) o programa **para** e diz o que fazer.
-
-```powershell
-copy .env.example .env         # preencha OPENAI_API_KEY ... ou use o Ollama:
-$env:PROVEDOR = "ollama"; $env:OLLAMA_MODEL = "llama3.1"
-python exemplos\07_aprovacao_revisao\main.py --auto nao,sim
-```
-
-**O que muda com LLM real:**
-- **Cada execução é diferente.** Os textos variam; o que a aula ensina (caminho do grafo, pausa, retomada, estado) não varia.
-- **Os fatos vêm do texto.** As denúncias de `caso.py` já trazem os fatos; o Investigador só os extrai e o LLM é proibido de inventar (veja `prompts.py`).
-- **Tempo.** Uma chamada leva segundos na OpenAI e de dezenas de segundos a minutos no Ollama em CPU (um exemplo chama o modelo de 3 a 8 vezes). Planeje o tempo.
-- **Paralelismo (exemplo 08).** Com OpenAI o ganho é claro; com Ollama local o servidor pode atender uma requisição por vez.
-
-## Desafio
-
-Em `desafio/`: um grafo em que **só casos de alto risco chamam o humano**; os de baixo
-risco são aprovados automaticamente. Veja [`desafio/README.md`](desafio/README.md). Para conferir:
-
-```powershell
+### 5.1 Desafio 1: Aprovação Condicionada ao Risco
+Localizado em `desafio/`. O sistema avalia a denúncia e inspeciona o parecer de risco:
+- Denúncias de **baixo risco** são aprovadas e homologadas de forma 100% autônoma.
+- Denúncias de **alto risco** acionam obrigatoriamente o checkpoint com `interrupt()`, solicitando validação humana.
+```bash
 python -m unittest desafio.test_desafio -v
 ```
 
-O **desafio 2** (`desafio2/`) reúne a aula toda: `juridico` e `risco` em **paralelo**, revisão
-limitada e **duas** aprovações humanas (gestor sempre; diretor só se o risco for alto).
-Veja [`desafio2/README.md`](desafio2/README.md):
-
-```powershell
+### 5.2 Desafio 2: Especialistas Concorrentes e Duplo Nível de Alçada
+Localizado em `desafio2/`. Reúne todos os conceitos avançados da aula:
+- O Investigador extrai os fatos da denúncia.
+- **Concorrência:** Jurídico e Risco processam em paralelo (Fan-Out).
+- O Relator consolida os pareceres (Fan-In).
+- **1º Nível:** O Gestor é consultado via `interrupt()`. Se rejeitar, o fluxo volta ao relator com feedback (máximo 3 tentativas).
+- **2º Nível:** Se o Gestor aprovar e o risco for Alto/Crítico, uma segunda interrupção consulta o Diretor Geral antes da conclusão.
+```bash
 python -m unittest desafio2.test_desafio2 -v
 ```
 
-## Troubleshooting
+---
 
-- **`ModuleNotFoundError: langgraph`** — ambiente virtual inativo; rode `.venv\Scripts\Activate.ps1`.
-- **"PROVEDOR=openai exige OPENAI_API_KEY" ou "o Ollama não responde"** — configure o `.env` (veja Provedores de LLM).
-- **`ModuleNotFoundError: langgraph.checkpoint.sqlite`** — falta `langgraph-checkpoint-sqlite`; rode `pip install -r requirements.txt`.
-- **`Não há execução pausada`** — rode antes o exemplo sem `--retomar`; ele cria o `checkpoints.db`.
-- **Caracteres estranhos no Windows** — `$env:PYTHONIOENCODING = "utf-8"`.
-- **`ModuleNotFoundError: prompts` / `caso` / `provedor`** — rode a partir de `aula7/`.
-- Os `checkpoints.db` são recriados a cada execução nova e estão no `.gitignore`; pode apagar.
+## 6. Configuração e Infraestrutura
 
-## Checklist final
+Todos os exemplos utilizam chamadas reais de LLM para demonstrar a variação natural e a robustez dos especialistas.
 
-- [ ] Ambiente criado e `langgraph` importa
-- [ ] Rodei 01 e 02 e expliquei por que especialistas são melhores que um generalista
-- [ ] Rodei 03 e sei a diferença entre estado e memória
-- [ ] Rodei 04 em dois processos (`--retomar`) e sei o que é `thread_id`
-- [ ] Rodei 05 e li o log `[nó]` do caminho percorrido
-- [ ] Rodei 06 e sei a diferença entre `interrupt_before` e `interrupt()`
-- [ ] Rodei 07 com `--auto nao,sim` e `--auto nao,nao,nao` e sei qual é a condição de parada
-- [ ] Rodei 07 com `--falha-tecnica` e sei por que isso não é uma rejeição
-- [ ] Rodei 08 e sei quando dá (e quando não dá) para paralelizar
-- [ ] Fiz o `exercicio.md` de cada exemplo
-- [ ] Resolvi os desafios 1 e 2
+```bash
+# Copiar o template de configuração
+cp .env.example .env
+
+# Configurar modelo desejado:
+# Para OpenAI (padrão):
+# OPENAI_API_KEY=sk-...
+# PROVIDER=openai
+
+# Para Ollama (local e gratuito):
+# PROVIDER=ollama
+# OLLAMA_MODEL=llama3.1
+```
+
+O banco de dados SQLite de checkpoints (`checkpoints.db`) é criado automaticamente no diretório local e é ignorado pelo Git para garantir segurança de dados e reprodutibilidade limpa.

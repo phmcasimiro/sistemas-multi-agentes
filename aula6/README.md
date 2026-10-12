@@ -1,226 +1,253 @@
 # Aula 6 — Modelagem de Sistemas Baseados em Grafos (LangGraph)
 
-Cenário único da aula: um **sistema de análise e tratamento de solicitações**.
-Um usuário envia um pedido (ex.: *"Preciso saber como solicitar uma segunda via
-de um documento"*) e o sistema recebe, classifica, pesquisa, analisa, valida,
-revisa e responde. Todos os exemplos são **evoluções do mesmo processo**.
+Cenário único da aula: um **sistema de análise e tratamento de solicitações governamentais**.
+Um cidadão envia um pedido (ex.: *"Preciso saber como solicitar uma segunda via de um documento"*), e o sistema deve orquestrar recebimento, classificação, pesquisa na base de conhecimento, análise técnica, validação, revisão iterativa e emissão da resposta final.
 
-> **Ideia central:** um agente complexo pode ser entendido como um sistema de
-> estados que percorre um grafo de execução.
+> **Tese Central:** Um agente autônomo complexo não é um script sequencial nem um laço de repetição ad-hoc; ele é uma **máquina de estados que percorre um grafo direcionado de execução**.
 >
-> **LangGraph nos permite transformar o fluxo de execução de um sistema baseado
-> em agentes em um grafo explícito de estados, nós e transições.**
+> **O LangGraph permite transformar o fluxo cognitivo e operacional de agentes em um grafo explícito de estados, nós e transições condicionais governáveis.**
 
-Este README cobre o setup e o mapa da aula. O conteúdo teórico está em
-[`aula-06.md`](aula-06.md).
+---
 
-## Objetivos
+## 1. Referencial Teórico Aprofundado
 
-Ao final da aula você será capaz de:
-
-- explicar por que um fluxo linear `A → B → C` deixa de ser suficiente;
-- descrever nós, arestas, grafos direcionados, DAGs e ciclos;
-- modelar um processo com **estado compartilhado** (`TypedDict`);
-- implementar grafos com **LangGraph** (`StateGraph`, arestas condicionais, ciclos);
-- garantir **condição de parada** em ciclos;
-- colocar um **LLM dentro de um nó** sem acoplar o grafo a um provedor;
-- enxergar um agente como um **grafo de execução**.
-
-## Pré-requisitos
-
-- **Python 3.10 ou mais novo**.
-- Aulas 1–5 (LLMs, tools, agentes, A2A, MCP). A Aula 6 parte delas.
-- **Nenhuma chave de API é necessária** para os conceitos fundamentais. Provedores reais
-  (OpenAI, Ollama, Claude) são complementares (exemplos 09 e 10).
-- Sem Docker, sem banco de dados, sem serviços externos.
-
-## Instalação
-
-PowerShell (Windows):
-
-```powershell
-git clone https://github.com/franciscomduarte/material-pcdf.git
-cd material-pcdf\aula6
-python -m venv .venv
-.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
+### 1.1 Do Fluxo Procedural aos Grafos de Execução
+Em sistemas tradicionais de IA, desenvolvedores frequentemente estruturam chamadas encadeadas em código imperativo:
+```python
+# Abordagem Frágil (Linear + Spaghettificação)
+resp1 = classificar(entrada)
+if resp1.categoria == "complexa":
+    resp2 = pesquisar(resp1)
+    while True:
+        analise = analisar(resp2)
+        if validar(analise):
+            break
+        corrigir(analise)
 ```
+Essa abordagem falha rapidamente em escala por três motivos fundamentais:
+1. **Ocultação do Fluxo:** As regras de transição ficam soterradas sob dezenas de `if`, `while` e blocos `try/except`. É impossível visualizar o processo sem inspecionar cada linha de código.
+2. **Dispersão do Estado:** Variáveis intermediárias ficam espalhadas no escopo local, gerando efeitos colaterais e inconsistências quando etapas precisam ser reexecutadas.
+3. **Rigidez e Falta de Auditoria:** Não há pontos padronizados para interceptação, checkpoints, inspeção de histórico ou reversão de passos.
 
-> Se o PowerShell bloquear a ativação (*"a execução de scripts foi desabilitada"*), rode
-> uma vez: `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`. No `cmd`, use
-> `.venv\Scripts\activate.bat`. Em Linux/Mac: `source .venv/bin/activate`.
+### 1.2 Anatomia de um Grafo no LangGraph
+O LangGraph modela a execução baseando-se na teoria dos grafos direcionados:
 
-Confirme a instalação:
-
-```powershell
-python -c "import langgraph; print('langgraph OK')"
-```
-
-## Execução
-
-Cada exemplo é uma pasta com um `main.py`. Rode a partir da pasta do exemplo ou
-informando o caminho:
-
-```powershell
-python exemplos\01_fluxo_linear\main.py
-python exemplos\10_agente_completo\main.py
-```
-
-Os exemplos 01–03 são Python puro (não precisam nem do LangGraph).
-
-## Exemplos — uma única evolução
-
-```
-01_fluxo_linear         O problema: A → B → C, sem decisão, sem volta
-        ↓
-02_grafo_conceitual     O mesmo processo como grafo (nós + arestas), em Python puro
-        ↓
-03_estado_compartilhado Um TypedDict que todos os nós leem e atualizam
-        ↓
-04_langgraph_basico     Primeiro StateGraph: START → receber → classificar → END
-        ↓
-05_multiplos_nos        Cadeia completa; nós devolvem só o que mudou
-        ↓
-06_fluxo_condicional    classificar decide: simples → responder | complexa → pesquisar
-        ↓
-07_dag                  Ramificação e convergência (sem ciclo)
-        ↓
-08_fluxo_ciclico        validar → revisar → analisar, com condição de parada
-        ↓
-09_llm_no_grafo         LLM como nó, atrás da abstração Modelo (Mock, OpenAI, Ollama ou Claude)
-        ↓
-10_agente_completo      Tudo junto: o agente como grafo de execução
-        ↓
-11_grafo_real           Próximo do real: função, LLM, MCP, API e tool como nós (DAG + ciclo)
-        ↓
-desafio                 Você implementa: análise de solicitação (Parte A: decisão e ciclo; Parte B: nós MCP, API e tool)
-desafio2                Você implementa: despacho de viatura (LLM + MCP + API + ciclo)
-        ↓
-desafio3                Você implementa: decisões tipadas com o JEV (LLM escreve, JEV decide; 5 caminhos)
-        ↓
-exercicio_guiado        Passo a passo: do grafo ao Mermaid e do Mermaid a um MCP Server
-        ↓
-demo_cofre              Demonstração em 5 pontos (estado, decisão, ciclo e parada), para fazer junto com a turma
-```
-
-Estrutura de diretórios:
-
-```
-aula6/
-├── README.md            # este arquivo
-├── aula-06.md           # material teórico (perguntas e respostas da aula)
-├── provedor.py          # escolhe o LLM (PROVEDOR no .env)
-├── .env.example
-├── requirements.txt
-├── exemplos/            # 01..11
-├── desafio/             # ENUNCIADO.md, README, esqueleto, Mock, pontos de controle e o MCP Server da Parte B
-├── desafio2/            # ENUNCIADO.md, README, esqueleto, Mock, MCP Server e dados
-├── desafio3/            # ENUNCIADO.md, README, esqueleto, jev.py (cliente do JEV) e pontos de controle
-├── exercicio_guiado/    # grafo -> Mermaid -> MCP (README com passos, esqueletos e testes)
-└── demo_cofre/          # o cofre (ENUNCIADO.md + README): o menor grafo com decisão, ciclo e parada
-```
-
-## LangGraph
-
-LangGraph **não substitui** LLM, Tools ou MCP. Ele fornece uma forma explícita de
-modelar o **fluxo de execução** em torno deles.
-
-| Conceito no LangGraph | Significado |
-|---|---|
-| `StateGraph(Estado)` | o grafo, parametrizado pelo tipo do estado |
-| `add_node("nome", funcao)` | nó: função `estado -> atualização parcial do estado` |
-| `add_edge(a, b)` | aresta fixa: depois de `a`, sempre `b` |
-| `add_conditional_edges(a, roteador)` | aresta condicional: `roteador(estado)` escolhe o próximo nó |
-| `START` / `END` | pontos de entrada e saída |
-| `compile()` | valida o grafo e devolve o executável |
-| `invoke(estado_inicial)` | executa e devolve o estado final |
-
-Limite de segurança contra ciclos infinitos: `invoke(estado, {"recursion_limit": N})`.
-Ao estourar, o LangGraph levanta `GraphRecursionError` (mostrado no exemplo 08).
-
-## Provedores de LLM (Mock, OpenAI, Ollama, Claude)
-
-Mesmo padrão das Aulas 4 e 5: a variável `PROVEDOR` (no `.env` ou no ambiente) escolhe o
-modelo, lida em [`provedor.py`](provedor.py). **O grafo não muda**, só o provedor.
-
-> **Exemplos 09, 10 e 11 usam LLM REAL, sem Mock.** O padrão é a **OpenAI** (`OPENAI_API_KEY`, como nas Aulas 4 e 5); para usar o **Ollama** local, defina `PROVEDOR=ollama`. Sem LLM real, o programa **para** e diz o que fazer. O desafio 2 também não usa Mock. Os exemplos 01 a 08 continuam no Mock, e os desafios 1 e 3 ainda caem no Mock (com aviso) quando falta chave.
-
-| `PROVEDOR` | O que é | Precisa de |
+| Elemento | Definição Formal | No LangGraph |
 |---|---|---|
-| `mock` | LLM de mentira, determinístico (padrão dos exemplos 01-08; nos testes dos desafios 1 e 3) | nada (sem internet, sem chave) |
-| `openai` (padrão dos exemplos 09, 10 e 11 e dos desafios) | OpenAI | `OPENAI_API_KEY` |
-| `ollama` | modelo local, grátis | Ollama rodando + modelo baixado |
-| `claude` | Anthropic (opcional) | `ANTHROPIC_API_KEY` |
+| **Vértice / Nó (Node)** | Unidade atômica de computação. Uma função puramente orientada a estado: `f(Estado) -> DeltaEstado`. | `workflow.add_node("nome", funcao)` |
+| **Aresta Direcionada (Edge)** | Transição estática e determinística de um nó $A$ para um nó $B$. | `workflow.add_edge("a", "b")` |
+| **Aresta Condicional (Conditional Edge)** | Transição dinâmica avaliada por uma função roteadora baseada no estado atual: `R(Estado) -> ProximoNo`. | `workflow.add_conditional_edges("a", roteador)` |
+| **Estado (State)** | Estrutura de dados imutável ou controlada (geralmente `TypedDict` ou Pydantic) compartilhada por todos os nós. | `class Estado(TypedDict): ...` |
+| **Pontos de Entrada / Saída** | Nós sentinela que marcam o início e a conclusão do grafo. | `START` e `END` |
 
-Configuração: `copy .env.example .env` e preencha só o que for usar. O `.env` está no
-`.gitignore`: **nunca coloque chaves no código nem faça commit delas**.
+### 1.3 DAGs vs. Grafos com Ciclos
+- **DAG (Directed Acyclic Graph):** Grafos direcionados acíclicos onde nenhuma aresta permite retornar a um nó antecedente. Ideais para pipelines de processamento paralelo (fan-out / fan-in) e etapas de enriquecimento de dados.
+- **Grafos Cíclicos:** Grafos contendo laços de realimentação ($A \to B \to C \to A$). São indispensáveis em arquiteturas de agentes para:
+  - Ciclos de auto-revisão (geração $\to$ crítica $\to$ correção);
+  - Repetição com refinamento de prompts ou ferramentas;
+  - Recuperação após respostas insatisfatórias ou dados incompletos.
 
-### Mock
+### 1.4 Condições de Parada e Teoria da Confiabilidade
+Em qualquer grafo com ciclos, a **terminação garantida** é um requisito crítico de segurança:
+1. **Critério Funcional:** O estado atinge uma condição de aceite (ex.: `valido == True` ou `precisa_revisao == False`).
+2. **Critério de Exaustão (Budget):** Um contador mantido no estado atinge o limite máximo (ex.: `tentativas >= MAX_TENTATIVAS`). O roteador desvia para um nó de contingência (`encaminhar_para_humano` ou `rejeicao_graciosa`).
+3. **Recursion Limit (Safeguard):** O LangGraph impõe um teto estrito de profundidade recursiva (`recursion_limit`). Se o ciclo rodar infinitamente, a biblioteca interrompe a execução com `GraphRecursionError`.
 
-`ModeloMock` roda sem internet e sem chave, e é o padrão dos exemplos 01-08 e dos testes dos desafios 1 e 3. Os exemplos 09, 10 e 11 e o desafio 2 **não** o usam. Foi escrito para produzir um
-fluxo realista, inclusive uma primeira análise reprovada na validação para que o ciclo
-de revisão apareça na execução.
+---
 
-```powershell
-python exemplos\10_agente_completo\main.py
+## 2. Esquemas de Arquitetura
+
+### 2.1 Topologia de Grafo Completo com Ciclo de Revisão (`10_agente_completo`)
+Abaixo está o fluxo percorrido pela solicitação do cidadão, ilustrando nós de LLM, funções de validação e o laço cíclico de revisão:
+
+```mermaid
+flowchart TD
+    START([START]) --> Receber[📥 receber_solicitacao]
+    Receber --> Classificar{🔀 classificar_solicitacao}
+    
+    Classificar -->|simples| ResponderSimples[⚡ responder_direto]
+    Classificar -->|complexa| Pesquisar[🔍 pesquisar_base]
+    
+    Pesquisar --> Analisar[🧠 analisar_com_llm]
+    Analisar --> Validar{⚖️ validar_resposta}
+    
+    Validar -->|Aprovado| Finalizar[✅ formatar_resposta]
+    Validar -->|Reprovado & tentativas < 3| Revisar[🔄 revisar_com_llm]
+    Validar -->|Reprovado & tentativas >= 3| Contingencia[🚨 acionar_supervisor]
+    
+    Revisar --> Validar
+    ResponderSimples --> END([END])
+    Finalizar --> END
+    Contingencia --> END
+
+    style Receber fill:#e1f5fe,stroke:#0288d1,stroke-width:2px;
+    style Classificar fill:#fff3e0,stroke:#f57c00,stroke-width:2px;
+    style Analisar fill:#ede7f6,stroke:#512da8,stroke-width:2px;
+    style Revisar fill:#fce4ec,stroke:#c2185b,stroke-width:2px;
+    style Validar fill:#fffde7,stroke:#fbc02d,stroke-width:2px;
+    style Finalizar fill:#e8f5e9,stroke:#388e3c,stroke-width:2px;
+    style Contingencia fill:#ffebee,stroke:#d32f2f,stroke-width:2px;
 ```
 
-### Ollama (local)
+### 2.2 Topologia de Decisões Tipadas com JEV (`desafio3`)
+No Desafio 3, o LLM propõe a justificativa, mas o **JEV (Julgador Especializado em Validação)** toma a decisão de forma estritamente tipada com 5 ramificações de saída:
 
-```powershell
-ollama pull llama3.1                 # uma vez
-$env:PROVEDOR = "ollama"
-$env:OLLAMA_MODEL = "llama3.1"       # o nome do modelo que você baixou
-python exemplos\10_agente_completo\main.py
+```mermaid
+flowchart TD
+    Inicio([START]) --> Receber[receber_pedido]
+    Receber --> Elaborar[elaborar_proposta_llm]
+    Elaborar --> JEV{⚖️ jev_julgar}
+    
+    JEV -->|APROVADO_DIRETO| Emitir[emitir_deferimento]
+    JEV -->|COMPLEMENTACAO| Notificar[solicitar_documentos]
+    JEV -->|REVISAO_TECNICA| Corrigir[corrigir_proposta]
+    JEV -->|INDEFERIDO| NotificarIndeferimento[emitir_indeferimento]
+    JEV -->|COMISSAO_ESPECIAL| Escalonar[escalonar_comissao]
+    
+    Corrigir --> Elaborar
+    Emitir --> Fim([END])
+    Notificar --> Fim
+    NotificarIndeferimento --> Fim
+    Escalonar --> Fim
 ```
 
-Em CPU, modelos de 7-8B levam dezenas de segundos por chamada; o exemplo 10 faz de 2 a 8.
+### 2.3 Topologia do Exercício Guiado: Grafo $\to$ Mermaid $\to$ MCP
+O exercício guiado conecta a abstração do LangGraph à arquitetura de protocolos da Aula 5:
 
-### OpenAI
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Dev as Aluno / Sistema
+    participant LG as LangGraph Workflow
+    participant Visual as exportar_mermaid()
+    participant MCP as MCP Server (mcp_grafos.py)
+    participant Client as Agente Consumidor MCP
 
-```powershell
-$env:PROVEDOR = "openai"
-$env:OPENAI_API_KEY = "sua-chave"
-python exemplos\10_agente_completo\main.py
+    Dev->>LG: Define StateGraph e Nós
+    Dev->>Visual: Inspeciona workflow.get_graph().draw_mermaid()
+    Visual-->>Dev: Retorna especificação visual do Grafo
+    Dev->>MCP: Registra Tool "executar_grafo" e "inspecionar_fluxo"
+    Client->>MCP: Chama Tool via JSON-RPC
+    MCP->>LG: Executa StateGraph.invoke()
+    LG-->>MCP: Retorna Estado Final
+    MCP-->>Client: Resposta estruturada
 ```
 
-### Claude (opcional)
+---
 
-```powershell
-$env:PROVEDOR = "claude"
-$env:ANTHROPIC_API_KEY = "sua-chave"
-python exemplos\10_agente_completo\main.py
+## 3. Estrutura de Diretórios da Aula 6
+
+```text
+aula6/
+├── README.md               # Este guia completo de teoria, arquitetura e execução
+├── aula-06.md              # Roteiro síncrono e perguntas pedagógicas da aula
+├── provedor.py             # Adaptador unificado multi-modelo (Mock, OpenAI, Ollama, Claude)
+├── requirements.txt        # Dependências (langgraph, langchain-core, etc.)
+├── .env.example            # Template de variáveis de ambiente
+├── exemplos/               # Progressão em 11 passos didáticos
+│   ├── 01_fluxo_linear/    # Código sequencial clássico (evidencia os limites de A -> B -> C)
+│   ├── 02_grafo_conceitual/# Mesma lógica modelada como dicionário de nós em Python puro
+│   ├── 03_estado_compartilhado/ # Introdução ao TypedDict como contrato de dados
+│   ├── 04_langgraph_basico/# Primeiro StateGraph compilado com START e END
+│   ├── 05_multiplos_nos/   # Encadeamento de múltiplos nós com deltas parciais
+│   ├── 06_fluxo_condicional/# Arestas condicionais com função roteadora
+│   ├── 07_dag/             # Directed Acyclic Graph (bifurcação e convergência)
+│   ├── 08_fluxo_ciclico/   # Introdução de laços de repetição e detecção de recursão
+│   ├── 09_llm_no_grafo/    # Inserção de LLMs reais dentro dos nós do grafo
+│   ├── 10_agente_completo/ # Agente orquestrado por grafo completo com ciclo de revisão
+│   └── 11_grafo_real/      # Integração heterogênea: Nós com Funções, LLM, APIs e MCP
+├── desafio/                # Desafio 1: Grafo de atendimento com urgência e pesquisa
+├── desafio2/               # Desafio 2: Despacho inteligente de viaturas (MCP + LLM)
+├── desafio3/               # Desafio 3: Decisões estritamente tipadas com o JEV (5 caminhos)
+├── exercicio_guiado/       # Conversão do grafo em Mermaid e exposição via FastMCP Server
+└── demo_cofre/             # Demonstração minimalista de estado, decisão, ciclo e parada
 ```
 
-Para voltar ao Mock: `$env:PROVEDOR = "mock"`. Para o Ollama (local, grátis): `$env:PROVEDOR = "ollama"` (com `ollama serve` no ar e o modelo baixado). Com LLM real, a 1ª análise pode passar
-direto na validação e o ciclo de revisão não aparecer (é esperado).
+---
 
-## Desafio
+## 4. Evolução Didática dos Exemplos
 
-Em `desafio/`: implemente o grafo de **análise de solicitação de atendimento**
-(urgente/normal, validação, revisão com limite de tentativas, e o caso em que a
-base não sabe responder). Há também um desafio conceitual: *o LLM sabe tudo?*
-Veja [`desafio/README.md`](desafio/README.md). Para conferir:
+| Exemplo | Conceito Central | O que demonstra |
+|---|---|---|
+| **01_fluxo_linear** | Rigidez do código procedural | Quatro funções chamadas em linha reta. Variáveis orfãs e ausência de desvios. |
+| **02_grafo_conceitual** | Grafo sem bibliotecas externas | Implementação de grafo com dicionário `{no: funcao}` e laço `while`. Mostra que a teoria independe de framework. |
+| **03_estado_compartilhado** | Contrato de dados centralizado | Uso de `TypedDict`. Nós leem o estado e produzem atualizações atômicas. |
+| **04_langgraph_basico** | Fundação com LangGraph | `StateGraph`, `add_node`, `add_edge`, `compile()` e `invoke()`. |
+| **05_multiplos_nos** | Imutabilidade e Deltas | Cada nó devolve apenas as chaves modificadas (`{"categoria": "..."}`), fundidas pelo LangGraph. |
+| **06_fluxo_condicional** | Roteamento dinâmico | `add_conditional_edges()` direciona pedidos simples diretamente para a resposta e complexos para a pesquisa. |
+| **07_dag** | Grafos acíclicos estruturados | Ramificação em tarefas independentes e posterior convergência em um nó integrador. |
+| **08_fluxo_ciclico** | Laço de repetição e segurança | Demonstração do ciclo `validar -> revisar -> analisar`. Indução e tratamento de `GraphRecursionError`. |
+| **09_llm_no_grafo** | Cognição desacoplada | Nós chamam o LLM encapsulado por `provedor.py`. O grafo orquestra; o LLM processa texto. |
+| **10_agente_completo** | Agente de produção completo | Todas as peças integradas com ciclo de auto-revisão limitado e contingência. |
+| **11_grafo_real** | Arquitetura mista | Nós heterogêneos executando código local, chamadas de LLM, requisições HTTP e Tools MCP. |
 
-```powershell
+---
+
+## 5. Prática e Desafios
+
+### 5.1 Desafio 1: Análise de Solicitação de Atendimento
+Localizado em `desafio/`. Implementa a triagem com prioridade:
+- Solicitações urgentes desviam para tratamento emergencial.
+- Validação técnica rigorosa com até 3 tentativas de revisão.
+- Tratamento de solicitações cuja resposta inexiste na base de conhecimento.
+```bash
 python -m unittest desafio.test_desafio -v
 ```
 
-## Troubleshooting
+### 5.2 Desafio 2: Despacho de Viaturas Policiais
+Localizado em `desafio2/`. Combina LLM com Tools MCP de geolocalização e banco de viaturas:
+- Extração de coordenadas da ocorrência.
+- Consulta da viatura disponível mais próxima via MCP.
+- Validação de regras operacionais em ciclo antes do despacho definitivo.
+```bash
+python desafio2/conferir.py
+```
 
-- **`ModuleNotFoundError: langgraph`** — o ambiente virtual não está ativo; rode `.venv\Scripts\Activate.ps1`.
-- **`GraphRecursionError`** — no exemplo 08 é intencional (demonstra o ciclo sem parada). Em outro lugar, seu ciclo não tem condição de parada.
-- **"PROVEDOR=openai exige OPENAI_API_KEY"** nos exemplos 09, 10 e 11 — copie `.env.example` para `.env` e preencha a chave, ou use `PROVEDOR=ollama` com `ollama serve` no ar.
-- **Ollama lento ou sem resposta** — confira `ollama list` e se o modelo de `OLLAMA_MODEL` existe.
+### 5.3 Desafio 3: Decisões Tipadas com o JEV
+Localizado em `desafio3/`. O LLM é proibido de tomar decisões de negócio arbitrárias; ele apenas sintetiza argumentos:
+- O **JEV (Julgador Especializado em Validação)** avalia a proposta e retorna um `ResultadoJulgamento` estritamente tipado.
+- 5 transições de saída possíveis: deferimento, complementação, revisão técnica, indeferimento ou escalonamento para comissão especial.
+```bash
+python -m unittest desafio3.test_desafio3 -v
+```
 
-## Checklist final
+### 5.4 Exercício Guiado: Do Grafo ao Mermaid e ao MCP
+Localizado em `exercicio_guiado/`:
+1. `passo1_mermaid.py`: Compilação e extração textual da topologia do grafo via `draw_mermaid()`.
+2. `mcp_grafos.py`: Servidor FastMCP que expõe o grafo compilado como uma ferramenta acessível por outros agentes.
+```bash
+python exercicio_guiado/test_guiado.py
+```
 
-- [ ] Ambiente criado e `langgraph` importa
-- [ ] Rodei os exemplos 01 a 03 e expliquei por que o fluxo linear não basta
-- [ ] Rodei 04 e 05 e sei o que um nó retorna (atualização parcial do estado)
-- [ ] Rodei 06 e vi os dois caminhos (simples e complexa)
-- [ ] Rodei 07 e sei por que é um DAG
-- [ ] Rodei 08 e sei qual é a condição de parada do ciclo
-- [ ] Rodei 09/10 com LLM real (OpenAI ou Ollama) e li o log `[nó]` do caminho percorrido (sem chave, o exemplo avisa e usa o Mock)
-- [ ] Rodei 10 com Ollama, OpenAI ou Claude sem alterar o grafo (opcional)
-- [ ] Resolvi o desafio
+---
+
+## 6. Configuração e Execução
+
+### 6.1 Configuração de Provedores (`.env`)
+Copie o template e configure o modelo desejado:
+```bash
+cp .env.example .env
+```
+
+| `PROVEDOR` | Requisitos | Casos de Uso Recomendados |
+|---|---|---|
+| `mock` | Nenhuma chave ou internet | Exemplos 01 a 08 e testes unitários automatizados |
+| `openai` | `OPENAI_API_KEY` preenchida | Exemplos 09, 10, 11 e Desafios 1, 2 e 3 |
+| `ollama` | Ollama rodando localmente (`ollama run llama3.1`) | Ambientes offline ou de custo zero |
+| `claude` | `ANTHROPIC_API_KEY` preenchida | Execuções alternativas com Anthropic Claude |
+
+### 6.2 Comandos de Execução
+```bash
+# Ativação do ambiente virtual
+source .venv/bin/activate  # Linux/Mac
+# ou .venv\Scripts\Activate.ps1 no Windows
+
+# Executar o fluxo conceitual inicial
+python exemplos/01_fluxo_linear/main.py
+
+# Executar o agente completo orquestrado pelo LangGraph
+python exemplos/10_agente_completo/main.py
+
+# Executar a demonstração do cofre de segurança
+python demo_cofre/main.py
+```
