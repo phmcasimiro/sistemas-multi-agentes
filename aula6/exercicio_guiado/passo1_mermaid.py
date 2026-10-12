@@ -31,11 +31,6 @@ pasta_saida.mkdir(exist_ok=True)
 (pasta_saida / f"{exemplo}.mmd").write_text(mermaid, encoding="utf-8")
 
 # TODO 4: salve em saida/<exemplo>.md um título e o Mermaid dentro de um bloco de código:
-#         # <exemplo>
-#
-#         ```mermaid
-#         ...aqui o Mermaid...
-#         ```
 conteudo_md = f"# {exemplo}\n\n```mermaid\n{mermaid}\n```\n"
 (pasta_saida / f"{exemplo}.md").write_text(conteudo_md, encoding="utf-8")
 

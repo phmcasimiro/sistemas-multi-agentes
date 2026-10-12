@@ -12,7 +12,6 @@ Tools a implementar (leia o README.md, passo 3):
 Testar SEM Claude:
     python cliente_teste.py
     python cliente_teste.py mermaid_do_grafo 07_dag
-    python cliente_teste.py descrever_grafo 07_dag
 
 REGRA DE OURO de um servidor stdio: NUNCA use print() aqui. O stdout é o canal do protocolo MCP;
 um print estraga a conversa (para depurar, use print(..., file=sys.stderr)).
@@ -33,7 +32,6 @@ mcp = MCPServer("grafos-mcp")
 @mcp.tool()
 def listar_exemplos() -> list[str]:
     """Lista os exemplos da Aula 6 cujo grafo pode ser consultado."""
-    # TODO 1: devolva a lista de exemplos (já importada acima).
     return EXEMPLOS
 
 
@@ -44,9 +42,6 @@ def mermaid_do_grafo(exemplo: str) -> str:
     Args:
         exemplo: nome da pasta do exemplo (ex.: '10_agente_completo'). Use listar_exemplos para ver as opções.
     """
-    # TODO 2: carregue o app do exemplo e devolva o Mermaid (como no passo 1).
-    #         Se o nome não existir, carregar_app levanta ValueError: devolva "ERRO: <mensagem>"
-    #         em vez de deixar o servidor quebrar.
     try:
         app = carregar_app(exemplo)
         return app.get_graph().draw_mermaid()
@@ -61,12 +56,6 @@ def descrever_grafo(exemplo: str) -> dict:
     Args:
         exemplo: nome da pasta do exemplo (ex.: '07_dag').
     """
-    # TODO 3: com grafo = carregar_app(exemplo).get_graph(), devolva:
-    #   {"exemplo": exemplo,
-    #    "nos": list(grafo.nodes),
-    #    "arestas": [{"origem": a.source, "destino": a.target, "condicional": bool(a.conditional)}
-    #                for a in grafo.edges]}
-    #   Exemplo desconhecido: devolva {"erro": "<mensagem>"}.
     try:
         app = carregar_app(exemplo)
         grafo = app.get_graph()

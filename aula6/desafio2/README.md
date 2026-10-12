@@ -25,16 +25,16 @@ python desafio2\conferir.py
 
 Ele mostra ✓/✗ por ponto, o que o teste encontrou, o que fazer e, no final, o **Mermaid do grafo como está agora** (cole em https://mermaid.live, ou abra `desafio2/saida/grafo_atual.md` no VS Code): você **vê o grafo crescer** a cada ponto.
 
-| Ponto | Você acrescenta | Teste confere |
-|---|---|---|
-| 1 | `receber` (14 campos) | todos os campos existem no estado |
-| 2 | `extrair` (LLM) | tipo, gravidade e bairro extraídos |
-| 3 | `localizar` (tool local), `pedir_endereco` e o 1º roteador | sem bairro termina em `pedir_endereco` |
-| 4 | `buscar_unidades` (MCP), `escalar` e o 2º roteador | sem unidade termina em `escalar` |
-| 5 | `consultar_clima` (API) e `calcular_tempo` | o grafo segue sem clima; chuva aumenta o tempo em 50% |
-| 6 | `acionar_apoio`, o roteador de apoio e `gerar_ordem` | apoio só se gravidade alta E tempo > 8 min |
-| 7 | `validar`, `revisar` e o ciclo | 1 revisão no caso do assalto |
-| 8 | a **parada**, no roteador de validar | para em `MAX_TENTATIVAS` |
+| Ponto | Você acrescenta                                                | Teste confere                                         |
+| ----- | --------------------------------------------------------------- | ----------------------------------------------------- |
+| 1     | `receber` (14 campos)                                         | todos os campos existem no estado                     |
+| 2     | `extrair` (LLM)                                               | tipo, gravidade e bairro extraídos                   |
+| 3     | `localizar` (tool local), `pedir_endereco` e o 1º roteador | sem bairro termina em`pedir_endereco`               |
+| 4     | `buscar_unidades` (MCP), `escalar` e o 2º roteador         | sem unidade termina em`escalar`                     |
+| 5     | `consultar_clima` (API) e `calcular_tempo`                  | o grafo segue sem clima; chuva aumenta o tempo em 50% |
+| 6     | `acionar_apoio`, o roteador de apoio e `gerar_ordem`        | apoio só se gravidade alta E tempo > 8 min           |
+| 7     | `validar`, `revisar` e o ciclo                              | 1 revisão no caso do assalto                         |
+| 8     | a**parada**, no roteador de validar                       | para em`MAX_TENTATIVAS`                             |
 
 ## O que já vem pronto (`main.py`)
 
@@ -48,20 +48,20 @@ Ele mostra ✓/✗ por ponto, o que o teste encontrou, o que fazer e, no final, 
 
 Os nós e roteadores (Fase A) e a montagem (Fase B), com **estes nomes de nó** (o tipo de cada um aparece colorido no desenho do `main.py`):
 
-| Nó | Tipo | O que faz |
-|---|---|---|
-| `receber` | função | limpa a entrada e inicializa **todos** os campos do estado |
-| `extrair` | LLM | devolve JSON com `tipo`, `gravidade` (`alta`/`baixa`) e `bairro` |
-| `localizar` | tool local | converte o bairro em latitude/longitude (use o dicionário `BAIRROS`) |
-| `pedir_endereco` | função | bairro desconhecido: pede o bairro e **encerra** |
-| `buscar_unidades` | MCP | chama `unidades_proximas` (raio de 20 km, limite 2) |
-| `escalar` | função | nenhuma unidade no raio: escala ao comando e **encerra** |
-| `consultar_clima` | API | Open-Meteo; se a API falhar, **o grafo segue** |
-| `calcular_tempo` | tool local | distância ÷ 40 km/h, em minutos; **+50% se estiver chovendo** |
-| `acionar_apoio` | função | inclui a 2ª unidade, se houver |
-| `gerar_ordem` | LLM | redige a ordem usando **só** os fatos do estado |
-| `validar` | LLM | a ordem é válida se citar a unidade despachada |
-| `revisar` | função | devolve o feedback para `gerar_ordem` |
+| Nó                 | Tipo       | O que faz                                                                 |
+| ------------------- | ---------- | ------------------------------------------------------------------------- |
+| `receber`         | função   | limpa a entrada e inicializa**todos** os campos do estado           |
+| `extrair`         | LLM        | devolve JSON com`tipo`, `gravidade` (`alta`/`baixa`) e `bairro` |
+| `localizar`       | tool local | converte o bairro em latitude/longitude (use o dicionário`BAIRROS`)    |
+| `pedir_endereco`  | função   | bairro desconhecido: pede o bairro e**encerra**                     |
+| `buscar_unidades` | MCP        | chama`unidades_proximas` (raio de 20 km, limite 2)                      |
+| `escalar`         | função   | nenhuma unidade no raio: escala ao comando e**encerra**             |
+| `consultar_clima` | API        | Open-Meteo; se a API falhar,**o grafo segue**                       |
+| `calcular_tempo`  | tool local | distância ÷ 40 km/h, em minutos;**+50% se estiver chovendo**      |
+| `acionar_apoio`   | função   | inclui a 2ª unidade, se houver                                           |
+| `gerar_ordem`     | LLM        | redige a ordem usando**só** os fatos do estado                     |
+| `validar`         | LLM        | a ordem é válida se citar a unidade despachada                          |
+| `revisar`         | função   | devolve o feedback para`gerar_ordem`                                    |
 
 Regras de decisão:
 
@@ -72,13 +72,13 @@ Regras de decisão:
 
 ## Caminhos esperados (podem variar um pouco com o LLM real)
 
-| Solicitação | Caminho |
-|---|---|
-| Assalto em andamento em Taguatinga | `receber → extrair → localizar → buscar_unidades → consultar_clima → calcular_tempo → gerar_ordem → validar → revisar → gerar_ordem → validar` |
-| Homem ferido em briga em Sobradinho | igual, com `acionar_apoio` entre `calcular_tempo` e `gerar_ordem` |
-| Tiro disparado no Gama | `receber → extrair → localizar → buscar_unidades → escalar` |
-| Barulho excessivo em festa na Asa Sul | como o 1º (gravidade baixa, sem apoio) |
-| Preciso de ajuda urgente | `receber → extrair → localizar → pedir_endereco` |
+| Solicitação                         | Caminho                                                                                                                                                    |
+| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Assalto em andamento em Taguatinga    | `receber → extrair → localizar → buscar_unidades → consultar_clima → calcular_tempo → gerar_ordem → validar → revisar → gerar_ordem → validar` |
+| Homem ferido em briga em Sobradinho   | igual, com`acionar_apoio` entre `calcular_tempo` e `gerar_ordem`                                                                                     |
+| Tiro disparado no Gama                | `receber → extrair → localizar → buscar_unidades → escalar`                                                                                          |
+| Barulho excessivo em festa na Asa Sul | como o 1º (gravidade baixa, sem apoio)                                                                                                                    |
+| Preciso de ajuda urgente              | `receber → extrair → localizar → pedir_endereco`                                                                                                      |
 
 ## Para testar o grafo: 5 perguntas, caminhos diferentes
 
@@ -89,13 +89,13 @@ Quando o grafo estiver completo (os 8 pontos ✓), rode as **5 ocorrências** ab
 python desafio2\main.py --perguntas
 ```
 
-| # | Ocorrência | O caminho começa por | Termina em | O que você deve observar |
-|---|---|---|---|---|
-| 1 | *Assalto em andamento em Taguatinga, preciso de uma viatura* | `receber → extrair → localizar → buscar_unidades → consultar_clima → calcular_tempo → gerar_ordem → ...` | `validar` | GRAVIDADE ALTA, MAS PERTO: o tempo fica abaixo de 8 min, então **não** aciona apoio. |
-| 2 | *Homem ferido em briga em Sobradinho* | `... → calcular_tempo → acionar_apoio → gerar_ordem → ...` | `validar` | GRAVIDADE ALTA E LONGE: tempo acima de 8 min, então aciona apoio. |
-| 3 | *Tiro disparado no Gama* | `receber → extrair → localizar → buscar_unidades → escalar` | `escalar` | NINGUÉM NO RAIO: o MCP devolve lista vazia. Não consulta o clima, não gera ordem. |
-| 4 | *Barulho excessivo em festa na Asa Sul* | `... → calcular_tempo → gerar_ordem → ...` | `validar` | GRAVIDADE BAIXA: mesmo caminho da 1, sem apoio. A decisão veio do **dado**. |
-| 5 | *Preciso de ajuda urgente* | `receber → extrair → localizar → pedir_endereco` | `pedir_endereco` | SEM BAIRRO: não localiza, não chama o MCP nem a API. Pede o endereço e encerra. |
+| # | Ocorrência                                                    | O caminho começa por                                                                                             | Termina em         | O que você deve observar                                                                   |
+| - | -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | ------------------ | ------------------------------------------------------------------------------------------- |
+| 1 | *Assalto em andamento em Taguatinga, preciso de uma viatura* | `receber → extrair → localizar → buscar_unidades → consultar_clima → calcular_tempo → gerar_ordem → ...` | `validar`        | GRAVIDADE ALTA, MAS PERTO: o tempo fica abaixo de 8 min, então**não** aciona apoio. |
+| 2 | *Homem ferido em briga em Sobradinho*                        | `... → calcular_tempo → acionar_apoio → gerar_ordem → ...`                                                  | `validar`        | GRAVIDADE ALTA E LONGE: tempo acima de 8 min, então aciona apoio.                          |
+| 3 | *Tiro disparado no Gama*                                     | `receber → extrair → localizar → buscar_unidades → escalar`                                                 | `escalar`        | NINGUÉM NO RAIO: o MCP devolve lista vazia. Não consulta o clima, não gera ordem.        |
+| 4 | *Barulho excessivo em festa na Asa Sul*                      | `... → calcular_tempo → gerar_ordem → ...`                                                                   | `validar`        | GRAVIDADE BAIXA: mesmo caminho da 1, sem apoio. A decisão veio do**dado**.           |
+| 5 | *Preciso de ajuda urgente*                                   | `receber → extrair → localizar → pedir_endereco`                                                             | `pedir_endereco` | SEM BAIRRO: não localiza, não chama o MCP nem a API. Pede o endereço e encerra.          |
 
 Depois de `gerar_ordem`, as ocorrências 1, 2 e 4 passam por `validar`; se o LLM reprovar a ordem, aparece o ciclo `revisar → gerar_ordem → validar`. Ele pode ou
 não aparecer: o que o teste confere é o **começo** do caminho e **onde ele termina**.

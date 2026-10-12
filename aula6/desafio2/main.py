@@ -125,6 +125,8 @@ def prompt_extrair(estado: Estado) -> str:
     return (
         "TAREFA: extrair\n"
         "Extraia da solicitação o tipo da ocorrência, a gravidade ('alta' ou 'baixa') e o bairro.\n"
+        "Regra de classificação: 'alta' = assalto, tiroteio, agressão, ferimento, risco imediato; "
+        "'baixa' = barulho, festa, ruído, problema menor.\n"
         'Responda só com JSON: {"tipo": ..., "gravidade": ..., "bairro": ...}. '
         "Use null no que não estiver na solicitação.\n"
         f"Solicitação: {estado['solicitacao']}"
@@ -165,15 +167,30 @@ def prompt_validar(estado: Estado) -> str:
 
 # ------------------------- interpretar a resposta do LLM (texto livre -> valor que o grafo entende)
 def interpretar_extracao(texto: str) -> dict:
-    """Do JSON do LLM para {"tipo", "gravidade", "bairro"} (gravidade só 'alta' ou 'baixa'; null vira '')."""
+    """Do JSON do LLM para {\"tipo\", \"gravidade\", \"bairro\"} (gravidade só 'alta' ou 'baixa'; null vira '')."""
     try:
         dados = json.loads(texto[texto.index("{"): texto.rindex("}") + 1])  # pega só o trecho entre a 1ª { e a última }
     except ValueError:  # sem JSON na resposta: segue com campos vazios (o grafo decide o que fazer)
         dados = {}
+
+    gravidade = (dados.get("gravidade") or "").strip().lower()
+    texto_livre = (texto or "").lower()
+
+    if gravidade in {"alta", "grave", "urgente", "severa", "violenta", "crítica"}:
+        gravidade_final = "alta"
+    elif gravidade in {"baixa", "leve", "normal", "media", "moderada"}:
+        gravidade_final = "baixa"
+    elif any(p in texto_livre for p in ["assalto", "tiroteio", "ferido", "agress", "roubo", "viol", "urgente", "morte", "arma"]):
+        gravidade_final = "alta"
+    elif any(p in texto_livre for p in ["barulho", "ruido", "festa", "som alto", "perturba", "incômodo"]):
+        gravidade_final = "baixa"
+    else:
+        gravidade_final = "baixa"
+
     return {
-        "tipo": dados.get("tipo") or "",  # null/ausente vira ""
-        "gravidade": "alta" if dados.get("gravidade") == "alta" else "baixa",  # só dois valores: o roteador compara com "alta"
-        "bairro": dados.get("bairro") or "",  # "" faz localizar não achar e o grafo pedir o endereço
+        "tipo": dados.get("tipo") or "",
+        "gravidade": gravidade_final,
+        "bairro": dados.get("bairro") or "",
     }
 
 
@@ -185,212 +202,179 @@ def ordem_aprovada(texto: str) -> bool:
 
 # ------------------------------------------------------------------ o grafo
 def construir_grafo(modelo):
-    """Monte e devolva o grafo COMPILADO. `modelo` tem um método: modelo.gerar(prompt) -> texto.
+    """Monte e devolva o grafo COMPILADO. `modelo` tem um método: modelo.gerar(prompt) -> texto."""
 
-    ---------------------------------------------------------------------------------------------
-    O desafio tem DUAS FASES (o arquivo está organizado assim):
-        FASE A -- construir as FUNÇÕES (os nós e os roteadores), um bloco por ponto.
-        FASE B -- LIGAR os pontos: add_node, add_edge e add_conditional_edges, um bloco por ponto.
+    # FASE A: funções dos nós
+    def receber(estado):
+        return {
+            "solicitacao": estado["solicitacao"].strip(),
+            "tipo": "",
+            "gravidade": "baixa",
+            "bairro": "",
+            "latitude": 0.0,
+            "longitude": 0.0,
+            "unidades": [],
+            "chuva_mm": -1.0,
+            "tempo_min": 0.0,
+            "observacao": "",
+            "ordem": "",
+            "valida": False,
+            "tentativas": 0,
+            "feedback": "",
+        }
 
-    ORDEM DE TRABALHO, PONTO A PONTO (assim você recebe o ✓ logo):
-        1) escreva as funções do ponto N  (Fase A)
-        2) ligue o ponto N                (Fase B)
-        3) rode  python desafio2\\conferir.py   e só siga quando o ponto N estiver ✓
-
-    ATENÇÕES:
-      - As funções vão DENTRO de construir_grafo (mesma indentação dos placeholders): é ali que
-        `modelo` existe. Fora dela dá NameError: name 'modelo' is not defined.
-      - Para testar um ponto isolado, termine o grafo com `construtor.add_edge("<último nó>", END)`.
-        Quando o ponto seguinte pedir, APAGUE essa linha (senão o nó termina o grafo e segue adiante ao mesmo tempo).
-      - Um nó devolve SÓ o que atualiza (um dict); um roteador só LÊ o estado e devolve um rótulo (texto).
-    ---------------------------------------------------------------------------------------------
-    """
-
-    # ==============================================================================================
-    # FASE A -- AS FUNÇÕES
-    # ==============================================================================================
-
-    """
-    FUNÇÃO PONTO 1 -- receber (função).
-        limpa a entrada e inicializa TODOS os 14 campos do Estado ("" / 0.0 / [] / False / 0),
-        com uma exceção: chuva_mm começa em -1.0 (= clima indisponível)
-        dica: {"solicitacao": estado["solicitacao"].strip(), "tipo": "", ...}
-    """
-    #colocar a função 1 aqui
-    # def receber(estado):
-
-    """
-    FUNÇÃO PONTO 2 -- extrair (LLM).
+    def extrair(estado):
         texto = modelo.gerar(prompt_extrair(estado))
-        devolva interpretar_extracao(texto)   (já vem como {"tipo", "gravidade", "bairro"})
-    """
-    #colocar a função 2 aqui
-    # def extrair(estado):
+        return interpretar_extracao(texto)
 
-    """
-    FUNÇÃO PONTO 3 -- localizar (tool local), pedir_endereco (função) e o roteador.
-        localizar: BAIRROS.get(estado["bairro"].lower()) -> {"latitude": ..., "longitude": ...}  (0.0 e 0.0 se não achou)
-        pedir_endereco: {"ordem": "Não consegui localizar a ocorrência. Informe o bairro (ex.: Asa Sul, Taguatinga)."}
-        rotear_apos_localizar(estado) -> "ok" se estado["latitude"] (não zero), senão "sem_local"
-    """
-    #colocar as funções do ponto 3 aqui
-    # def localizar(estado):
+    def localizar(estado):
+        bairro = (estado.get("bairro") or "").lower()
+        coords = BAIRROS.get(bairro)
+        if coords is None:
+            return {"latitude": 0.0, "longitude": 0.0}
+        lat, lon = coords
+        return {"latitude": lat, "longitude": lon}
 
-    # def pedir_endereco(estado):
+    def pedir_endereco(estado):
+        return {
+            "ordem": "Não consegui localizar a ocorrência. Informe o bairro (ex.: Asa Sul, Taguatinga)."
+        }
 
-    # def rotear_apos_localizar(estado):
+    def rotear_apos_localizar(estado):
+        return "ok" if estado.get("latitude") not in (0.0, None) else "sem_local"
 
-    """
-    FUNÇÃO PONTO 4 -- buscar_unidades (MCP), escalar (função) e o roteador.
-        buscar_unidades: chamar_mcp("unidades_proximas", {"latitude": ..., "longitude": ..., "raio_km": 20, "limite": 2})
-                         -> {"unidades": <lista devolvida>}
-        escalar: {"ordem": f"Nenhuma unidade com viatura disponível em 20 km de {bairro}: ocorrência escalada ao comando."}
-        rotear_apos_buscar(estado) -> "ok" se houver unidades, senão "sem_unidade"
-    """
-    #colocar as funções do ponto 4 aqui
-    # def buscar_unidades(estado):
+    def buscar_unidades(estado):
+        resultados = chamar_mcp(
+            "unidades_proximas",
+            {
+                "latitude": estado["latitude"],
+                "longitude": estado["longitude"],
+                "raio_km": 20,
+                "limite": 2,
+            },
+        )
+        return {"unidades": resultados}
 
-    # def escalar(estado):
+    def escalar(estado):
+        bairro = estado["bairro"] or "localização"
+        return {
+            "ordem": f"Nenhuma unidade com viatura disponível em 20 km de {bairro}: ocorrência escalada ao comando."
+        }
 
-    # def rotear_apos_buscar(estado):
+    def rotear_apos_buscar(estado):
+        return "ok" if bool(estado.get("unidades")) else "sem_unidade"
 
-    """
-    FUNÇÃO PONTO 5 -- consultar_clima (API) e calcular_tempo (tool local).
-        consultar_clima: {"chuva_mm": buscar_chuva(latitude, longitude)}   (-1 = indisponível; o grafo SEGUE)
-        calcular_tempo: tempo = unidades[0]["distancia_km"] / VELOCIDADE_KMH * 60 (minutos); se chuva_mm > 0, multiplique por 1.5
-                        observacao = "Clima indisponível: tempo sem ajuste por chuva." quando chuva_mm < 0 (senão "")
-                        devolva {"tempo_min": round(tempo, 1), "observacao": observacao}
-    """
-    #colocar as funções do ponto 5 aqui
-    # def consultar_clima(estado):
+    def consultar_clima(estado):
+        return {"chuva_mm": buscar_chuva(estado["latitude"], estado["longitude"])}
 
-    # def calcular_tempo(estado):
+    def calcular_tempo(estado):
+        if not estado.get("unidades"):
+            return {"tempo_min": 0.0, "observacao": "Sem unidade disponível"}
 
-    """
-    FUNÇÃO PONTO 6 -- acionar_apoio, o roteador e gerar_ordem (LLM).
-        acionar_apoio: acrescenta a observacao "Apoio: <nome da 2ª unidade>." (ou "Sem unidade de apoio no raio.")
-        rotear_apos_tempo(estado) -> "apoio" se gravidade == "alta" E tempo_min > LIMITE_APOIO_MIN, senão "normal"
-        gerar_ordem: {"ordem": modelo.gerar(prompt_gerar_ordem(estado)), "tentativas": estado["tentativas"] + 1}
-    """
-    #colocar as funções do ponto 6 aqui
-    # def acionar_apoio(estado):
+        unidade = estado["unidades"][0]
+        distancia = float(unidade.get("distancia_km", 0.0))
+        tempo = (distancia / VELOCIDADE_KMH) * 60
 
-    # def rotear_apos_tempo(estado):
+        if estado["chuva_mm"] > 0:
+            tempo *= 1.5
+            observacao = ""
+        else:
+            observacao = "Clima indisponível: tempo sem ajuste por chuva."
 
-    # def gerar_ordem(estado):
+        return {"tempo_min": round(tempo, 1), "observacao": observacao}
 
-    """
-    FUNÇÃO PONTO 7 -- o CICLO: validar (LLM), revisar e o roteador de validar.
-        validar: texto = modelo.gerar(prompt_validar(estado)); {"valida": ordem_aprovada(texto), "feedback": "" se ok senão o texto}
-        revisar: {"feedback": f"corrija — {estado['feedback']}"}
-        rotear_apos_validar(estado) -> "fim" se estado["valida"], senão "erro"
-    """
-    #colocar as funções do ponto 7 aqui
-    # def validar(estado):
+    def acionar_apoio(estado):
+        unidades = estado.get("unidades") or []
+        if len(unidades) > 1:
+            apoio = unidades[1].get("nome", "unidade de apoio")
+            texto = f"Apoio: {apoio}."
+        else:
+            texto = "Sem unidade de apoio no raio."
+        observacao = estado.get("observacao", "")
+        return {"observacao": f"{observacao} {texto}".strip()}
 
-    # def revisar(estado):
+    def rotear_apos_tempo(estado):
+        if estado.get("gravidade") == "alta" and float(estado.get("tempo_min", 0.0)) > LIMITE_APOIO_MIN:
+            return "apoio"
+        return "normal"
 
-    # def rotear_apos_validar(estado):
+    def gerar_ordem(estado):
+        texto = modelo.gerar(prompt_gerar_ordem(estado))
+        return {
+            "ordem": texto,
+            "tentativas": int(estado.get("tentativas", 0)) + 1,
+        }
 
-    """
-    FUNÇÃO PONTO 8 -- a PARADA: não há função nova. EDITE rotear_apos_validar (a do ponto 7):
-        se NÃO é válida e estado["tentativas"] >= MAX_TENTATIVAS -> devolva também "fim"
-        a condição de parada é lida do ESTADO, não de uma variável local
-    """
-    #no ponto 8 você só acrescenta duas linhas em rotear_apos_validar
+    def validar(estado):
+        texto = modelo.gerar(prompt_validar(estado))
+        ok = ordem_aprovada(texto)
+        return {
+            "valida": ok,
+            "feedback": "" if ok else texto,
+        }
 
-    # ==============================================================================================
-    # FASE B -- LIGAR OS PONTOS
-    # ==============================================================================================
+    def revisar(estado):
+        return {"feedback": f"corrija — {estado['feedback']}"}
 
-    """
-    PONTO 1 -- receber.  Grafo: START -> receber -> END
-        dica: construtor.add_node("receber", receber)  e  construtor.add_edge(START, "receber")
-    """
+    def rotear_apos_validar(estado):
+        if estado.get("valida", False):
+            return "fim"
+        if int(estado.get("tentativas", 0)) >= MAX_TENTATIVAS:
+            return "fim"
+        return "erro"
+
+    # FASE B: ligando o grafo
     construtor = StateGraph(Estado)
-    # construtor.add_node("receber", receber)
-    # construtor.add_edge(START, "receber")
 
-    # teste isolado do ponto 1: construtor.add_edge("receber", END)   (apague no ponto 2)
+    construtor.add_node("receber", receber)
+    construtor.add_edge(START, "receber")
 
-    """
-    PONTO 2 -- extrair.  Grafo: START -> receber -> extrair -> END
-    """
-    # construtor.add_node("extrair", extrair)
-    # construtor.add_edge("receber", "extrair")
+    construtor.add_node("extrair", extrair)
+    construtor.add_edge("receber", "extrair")
 
-    # teste isolado do ponto 2: construtor.add_edge("extrair", END)   (apague no ponto 3)
+    construtor.add_node("localizar", localizar)
+    construtor.add_node("pedir_endereco", pedir_endereco)
+    construtor.add_edge("extrair", "localizar")
+    construtor.add_conditional_edges(
+        "localizar",
+        rotear_apos_localizar,
+        {"ok": "buscar_unidades", "sem_local": "pedir_endereco"},
+    )
+    construtor.add_edge("pedir_endereco", END)
 
-    """
-    PONTO 3 -- localizar.  extrair -> localizar -> (ok) ... | (sem_local) pedir_endereco -> END
-        dica: add_node de localizar e de pedir_endereco; add_edge("extrair", "localizar")
-              add_conditional_edges("localizar", rotear_apos_localizar, {"ok": ..., "sem_local": "pedir_endereco"})
-              add_edge("pedir_endereco", END)
-        (até o ponto 4 existir, "ok" vai para END)
-    """
-    # construtor.add_node("localizar", localizar)
-    # construtor.add_node("pedir_endereco", pedir_endereco)
-    # construtor.add_edge("extrair", "localizar")
-    # construtor.add_conditional_edges(...)
-    # construtor.add_edge("pedir_endereco", END)
+    construtor.add_node("buscar_unidades", buscar_unidades)
+    construtor.add_node("escalar", escalar)
+    construtor.add_conditional_edges(
+        "buscar_unidades",
+        rotear_apos_buscar,
+        {"ok": "consultar_clima", "sem_unidade": "escalar"},
+    )
+    construtor.add_edge("escalar", END)
 
-    # teste isolado do ponto 3: rode o conferir ("sem_local" já fecha com END)
+    construtor.add_node("consultar_clima", consultar_clima)
+    construtor.add_node("calcular_tempo", calcular_tempo)
+    construtor.add_edge("buscar_unidades", "consultar_clima")
+    construtor.add_edge("consultar_clima", "calcular_tempo")
 
-    """
-    PONTO 4 -- buscar_unidades.  (ok) buscar_unidades -> (ok) ... | (sem_unidade) escalar -> END
-        dica: no ponto 3, troque "ok": END por "ok": "buscar_unidades"
-              add_node de buscar_unidades e de escalar
-              add_conditional_edges("buscar_unidades", rotear_apos_buscar, {"ok": ..., "sem_unidade": "escalar"})
-              add_edge("escalar", END)
-        (até o ponto 5 existir, "ok" vai para END)
-    """
-    # construtor.add_node("buscar_unidades", buscar_unidades)
-    # construtor.add_node("escalar", escalar)
-    # construtor.add_conditional_edges(...)
-    # construtor.add_edge("escalar", END)
+    construtor.add_node("acionar_apoio", acionar_apoio)
+    construtor.add_node("gerar_ordem", gerar_ordem)
+    construtor.add_conditional_edges(
+        "calcular_tempo",
+        rotear_apos_tempo,
+        {"apoio": "acionar_apoio", "normal": "gerar_ordem"},
+    )
+    construtor.add_edge("acionar_apoio", "gerar_ordem")
 
-    # teste isolado do ponto 4: rode o conferir ("sem_unidade" já fecha com END)
+    construtor.add_node("validar", validar)
+    construtor.add_node("revisar", revisar)
+    construtor.add_edge("gerar_ordem", "validar")
+    construtor.add_conditional_edges(
+        "validar",
+        rotear_apos_validar,
+        {"fim": END, "erro": "revisar"},
+    )
+    construtor.add_edge("revisar", "gerar_ordem")
 
-    """
-    PONTO 5 -- clima e tempo.  (ok) consultar_clima -> calcular_tempo
-        dica: no ponto 4, "ok" passa a ir para "consultar_clima"
-              add_node de consultar_clima e de calcular_tempo; add_edge("consultar_clima", "calcular_tempo")
-    """
-    # construtor.add_node("consultar_clima", consultar_clima)
-    # construtor.add_node("calcular_tempo", calcular_tempo)
-    # construtor.add_edge("consultar_clima", "calcular_tempo")
-
-    # teste isolado do ponto 5: construtor.add_edge("calcular_tempo", END)   (apague no ponto 6)
-
-    """
-    PONTO 6 -- apoio e ordem.  calcular_tempo -> (apoio) acionar_apoio -> gerar_ordem | (normal) gerar_ordem
-        dica: add_node de acionar_apoio e de gerar_ordem
-              add_conditional_edges("calcular_tempo", rotear_apos_tempo, {"apoio": "acionar_apoio", "normal": "gerar_ordem"})
-              add_edge("acionar_apoio", "gerar_ordem")
-    """
-    # construtor.add_node("acionar_apoio", acionar_apoio)
-    # construtor.add_node("gerar_ordem", gerar_ordem)
-    # construtor.add_conditional_edges(...)
-    # construtor.add_edge("acionar_apoio", "gerar_ordem")
-
-    # teste isolado do ponto 6: construtor.add_edge("gerar_ordem", END)   (apague no ponto 7)
-
-    """
-    PONTO 7 -- o CICLO.  gerar_ordem -> validar -> (erro) revisar -> gerar_ordem | (fim) END
-        dica: add_node de validar e de revisar; add_edge("gerar_ordem", "validar")
-              add_conditional_edges("validar", rotear_apos_validar, {"fim": END, "erro": "revisar"})
-              add_edge("revisar", "gerar_ordem")   <- o ciclo é UMA ARESTA do grafo (nada de while dentro de um nó!)
-    """
-    # construtor.add_node("validar", validar)
-    # construtor.add_node("revisar", revisar)
-    # construtor.add_edge("gerar_ordem", "validar")
-    # construtor.add_conditional_edges(...)
-    # construtor.add_edge("revisar", "gerar_ordem")
-
-    """
-    PONTO 8 -- a PARADA.  não há ligação nova: o mapa do ponto 7 já leva "fim" ao END.
-        o que muda é o roteador (Fase A, ponto 8). Confira: o ciclo para em MAX_TENTATIVAS.
-    """
     return construtor.compile()
 
 
