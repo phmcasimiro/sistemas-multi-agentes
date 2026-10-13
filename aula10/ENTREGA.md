@@ -25,18 +25,18 @@ Compare **caminho e estado**, não o texto do despacho.
 
 | Caso | Caminho percorrido | Resultado (bloqueado / pediu dados / triagem humana / indeferido / pausou na chefia / registrado + protocolo) | Bateu com o esperado? |
 |---|---|---|---|
-| C1_abono_simples | | | |
-| C2_ferias_com_venda | | | |
-| C3_dado_de_saude | | | |
-| C4_fora_do_escopo | | | |
-| C5_sem_matricula | | | |
-| C6_conflito_de_escala | | | |
-| C7_autoaprovacao | | | |
-| C8_idempotencia | | | |
-| C9_divergencia | | | |
-| C10_zona_cinzenta | | | |
-| C11_diaria_exterior | | | |
-| C12_inicio_proibido | | | |
+| C1_abono_simples | receber -> proteger_entrada -> extrair -> identificar_servidor -> calcular_periodo -> normas/escala/financeiro -> consolidar -> redigir_despacho -> validar -> registrar | registrado (deferido, protocolo ae788d33) | Sim |
+| C2_ferias_com_venda | receber -> proteger_entrada -> extrair -> identificar_servidor -> calcular_periodo -> normas/escala/financeiro -> consolidar -> redigir_despacho -> validar -> aprovacao_chefia -> registrar | registrado (deferido, protocolo b7b6f485) | Sim |
+| C3_dado_de_saude | receber -> proteger_entrada -> recusar | bloqueado | Sim |
+| C4_fora_do_escopo | receber -> proteger_entrada -> recusar | bloqueado | Sim |
+| C5_sem_matricula | receber -> proteger_entrada -> extrair -> pedir_dados | pediu dados | Sim |
+| C6_conflito_de_escala | receber -> proteger_entrada -> extrair -> identificar_servidor -> calcular_periodo -> normas/escala/financeiro -> consolidar -> redigir_despacho -> validar -> registrar | registrado (indeferido, protocolo 6f1b47d7) | Sim |
+| C7_autoaprovacao | receber -> proteger_entrada -> recusar | bloqueado | Sim |
+| C8_idempotencia | receber -> proteger_entrada -> extrair -> identificar_servidor -> calcular_periodo -> normas/escala/financeiro -> consolidar -> redigir_despacho -> validar -> registrar | registrado (duplicado, protocolo ae788d33) | Sim |
+| C9_divergencia | receber -> proteger_entrada -> extrair -> pedir_dados | pediu dados | Sim |
+| C10_zona_cinzenta | receber -> proteger_entrada -> recusar | bloqueado | Sim |
+| C11_diaria_exterior | receber -> proteger_entrada -> extrair -> identificar_servidor -> calcular_periodo -> normas/escala/financeiro -> consolidar -> redigir_despacho -> validar -> aprovacao_chefia -> registrar | registrado (deferido, protocolo ec67dba1) | Sim |
+| C12_inicio_proibido | receber -> proteger_entrada -> extrair -> identificar_servidor -> calcular_periodo -> normas/escala/financeiro -> consolidar -> redigir_despacho -> validar -> registrar | registrado (indeferido, protocolo 7c458e62) | Sim |
 
 ## O grafo
 
