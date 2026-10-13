@@ -62,45 +62,109 @@ def cotacao_dolar() -> str:
 
 # ------------------------------------------------------------------ ETAPA 6.1: especialistas
 def criar_normas() -> Agent:
-    # ETAPA 6.1 -- Agent(name="Normas", instructions=..., tools=[consultar_normas], model_settings=CONFIG)
-    #   Responsabilidade: dizer QUAIS regras se aplicam ao pedido e explicá-las em linguagem simples.
-    #   NÃO calcula valores, NÃO consulta a escala. Recebe também as violações objetivas (etapa06_regras.py) para explicá-las.
-    raise NotImplementedError("ETAPA 6.1: criar_normas")
+    return Agent(
+        name="Normas",
+        instructions=(
+            "Você é o especialista em normas e regras internas do RH.\n"
+            "Sua responsabilidade é explicar quais regras da norma se aplicam ao pedido recebido "
+            "(como N1 a N10) e esclarecer eventuais violações objetivas apontadas, em linguagem simples e clara.\n"
+            "Use a ferramenta `consultar_normas` para consultar as regras pelo tema.\n"
+            "NÃO calcula valores nem consulta a escala de pessoal."
+        ),
+        tools=[consultar_normas],
+        model_settings=CONFIG,
+    )
 
 
 def criar_escala() -> Agent:
-    # ETAPA 6.1 -- tools=[consultar_escala]. Confere a N5 e, se houver conflito, SUGERE outro período
-    #   (com o mesmo número de dias, começando num dia permitido).
-    raise NotImplementedError("ETAPA 6.1: criar_escala")
+    return Agent(
+        name="Escala",
+        instructions=(
+            "Você é o especialista em escala de trabalho e controle de afastamentos simultâneos da equipe.\n"
+            "Sua responsabilidade é consultar a escala da equipe usando a ferramenta `consultar_escala` e "
+            "verificar se o pedido cumpre a regra N5 (limite de afastados simultâneos na equipe).\n"
+            "Se houver conflito de escala ou excesso de afastamentos, informe o conflito e SUGIRA outro período "
+            "com a mesma quantidade de dias, iniciando em um dia permitido (que não seja sexta-feira, sábado, "
+            "domingo ou véspera de feriado, conforme a regra N3)."
+        ),
+        tools=[consultar_escala],
+        model_settings=CONFIG,
+    )
 
 
 def criar_financeiro() -> Agent:
-    # ETAPA 6.1 -- tools=[tabela_diarias, consultar_remuneracao, cotacao_dolar].
-    #   Venda de férias (N2): dias_vendidos x salario_base / 30. Diárias (N7): uma por pernoite + meia no retorno;
-    #   no exterior, em USD convertido pela cotação. Mostre a conta. Câmbio indisponível -> "a calcular".
-    #   É o ÚNICO agente que vê o salário.
-    raise NotImplementedError("ETAPA 6.1: criar_financeiro")
+    return Agent(
+        name="Financeiro",
+        instructions=(
+            "Você é o especialista financeiro de RH.\n"
+            "Sua responsabilidade é calcular os impactos financeiros do pedido:\n"
+            "1. Venda de férias (abono pecuniário, N2): consulte o salário com `consultar_remuneracao` "
+            "e calcule: dias_vendidos * salario_base / 30.\n"
+            "2. Diárias (N7): consulte o valor e moeda da diária com `tabela_diarias`. Calcule uma diária por "
+            "pernoite completo mais meia diária (0.5) no dia de retorno. Se o destino for no exterior, consulte "
+            "`cotacao_dolar` para converter USD para BRL. Se a cotação estiver indisponível, informe o total em "
+            "USD e anote 'câmbio a calcular na liquidação'.\n"
+            "Sempre mostre a memória de cálculo. Você é o ÚNICO agente autorizado a consultar remuneração."
+        ),
+        tools=[tabela_diarias, consultar_remuneracao, cotacao_dolar],
+        model_settings=CONFIG,
+    )
 
 
 def criar_redator() -> Agent:
-    # ETAPA 6.1 -- sem tools. Escreve o DESPACHO (deferimento ou indeferimento) usando SÓ os fatos recebidos:
-    #   matrícula, período, decisão, regras citadas, valores e, no indeferimento, a sugestão de datas.
-    #   Nunca escreve CPF nem dado de saúde (N10). Se receber um feedback (da validação ou da chefia), corrige.
-    raise NotImplementedError("ETAPA 6.1: criar_redator")
+    return Agent(
+        name="Redator",
+        instructions=(
+            "Você é o redator oficial do RH encarregado de emitir o DESPACHO administrativo.\n"
+            "Escreva um despacho formal e conclusivo (deferimento ou indeferimento) usando EXCLUSIVAMENTE os fatos recebidos:\n"
+            "- Matrícula do servidor\n"
+            "- Tipo de pedido e período solicitado\n"
+            "- Decisão final (DEFERIDO ou INDEFERIDO)\n"
+            "- Regras citadas e fundamentação técnica dos especialistas\n"
+            "- Valores e memórias de cálculo apurados (se houver)\n"
+            "- Em caso de indeferimento, inclua a justificativa clara e a sugestão de datas alternativas fornecida pela escala.\n"
+            "ATENÇÃO: NUNCA mencione CPF nem dados médicos/diagnósticos/CID (regra N10). "
+            "Se receber feedback de revisão, corrija pontualmente o texto mantendo a formalidade."
+        ),
+        tools=[],
+        model_settings=CONFIG,
+    )
 
 
 # ------------------------------------------------------------------ ETAPA 6.2: coordenador
 def criar_coordenador(hooks: RunHooks | None = None, tools_extras: list | None = None) -> Agent:
-    # ETAPA 6.2 -- Agent(name="Coordenador", instructions=..., tools=[
-    #       criar_normas().as_tool(tool_name="parecer_normas", tool_description=..., hooks=hooks,
-    #                              failure_error_function=None),
-    #       criar_escala().as_tool(tool_name="parecer_escala", ..., hooks=hooks, failure_error_function=None),
-    #       criar_financeiro().as_tool(tool_name="parecer_financeiro", ..., hooks=hooks, failure_error_function=None),
-    #       *(tools_extras or [])])
-    #   O Coordenador decide QUAIS especialistas consultar (abono não precisa do Financeiro) e junta os pareceres.
-    #   hooks=hooks nas as_tool faz o hook do 🆕 B enxergar também as tools DENTRO de cada especialista.
-    #   failure_error_function=None: sem isso, um erro dentro do especialista (inclusive o bloqueio do 🆕 B) vira só
-    #   um texto de erro para o Coordenador, que segue em frente. Com None, o erro interrompe a execução.
-    #   tools_extras serve só para o teste do 🆕 B (dar de propósito consultar_remuneracao ao Coordenador).
-    #   Referência: aula4/ex03_agente_as_tool.py
-    raise NotImplementedError("ETAPA 6.2: criar_coordenador")
+    tools = [
+        criar_normas().as_tool(
+            tool_name="parecer_normas",
+            tool_description="Obtém o parecer do especialista em normas sobre as regras aplicáveis e violações do pedido.",
+            hooks=hooks,
+            failure_error_function=None,
+        ),
+        criar_escala().as_tool(
+            tool_name="parecer_escala",
+            tool_description="Obtém o parecer do especialista em escala sobre afastamentos da equipe e sugestão de novo período em caso de conflito.",
+            hooks=hooks,
+            failure_error_function=None,
+        ),
+        criar_financeiro().as_tool(
+            tool_name="parecer_financeiro",
+            tool_description="Obtém o parecer do especialista financeiro calculando venda de férias ou diárias de viagem.",
+            hooks=hooks,
+            failure_error_function=None,
+        ),
+        *(tools_extras or []),
+    ]
+
+    return Agent(
+        name="Coordenador",
+        instructions=(
+            "Você é o Coordenador de Atendimento de RH.\n"
+            "Sua responsabilidade é avaliar o pedido do servidor e consultar os especialistas necessários através das suas tools:\n"
+            "- Consulte `parecer_normas` para entender as regras aplicáveis e fundamentar o caso.\n"
+            "- Consulte `parecer_escala` para pedidos de férias ou abono que impactem a escala de serviço.\n"
+            "- Consulte `parecer_financeiro` APENAS quando houver impacto financeiro (ex.: venda de férias com dias_vendidos > 0, ou diárias). Pedidos de abono simples NÃO necessitam do financeiro.\n"
+            "Consolide todos os pareceres em uma análise técnica coordenada e conclusiva."
+        ),
+        tools=tools,
+        model_settings=CONFIG,
+    )

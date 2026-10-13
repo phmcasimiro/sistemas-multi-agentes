@@ -48,14 +48,17 @@ def configurar() -> str:
     provedor = os.getenv("PROVEDOR", "openai").strip().lower()
     set_tracing_disabled(True)  # sem envio de traces para a OpenAI
 
-    if provedor == "openai":
+    if provedor in ("openai", "zen"):
         chave = os.getenv("OPENAI_API_KEY")
         if not chave:
-            raise SystemExit("PROVEDOR=openai exige OPENAI_API_KEY.\n" + AJUDA)
-        modelo = os.getenv("OPENAI_DEFAULT_MODEL", "gpt-4o-mini")
+            raise SystemExit("PROVEDOR=openai/zen exige OPENAI_API_KEY.\n" + AJUDA)
+        modelo = os.getenv("OPENAI_MODEL") or os.getenv("OPENAI_DEFAULT_MODEL", "deepseek-v4.1-flash")
+        base_url = os.getenv("OPENAI_BASE_URL")
         os.environ["OPENAI_DEFAULT_MODEL"] = modelo  # é o modelo que todo Agent(...) usa quando não recebe `model`
-        set_default_openai_client(_cliente(None, chave))
-        return f"openai:{modelo}"
+        set_default_openai_client(_cliente(base_url, chave))
+        if base_url or provedor == "zen":
+            set_default_openai_api("chat_completions")
+        return f"{provedor}:{modelo}"
 
     if provedor == "ollama":
         base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1")

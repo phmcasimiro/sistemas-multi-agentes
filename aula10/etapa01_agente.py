@@ -35,25 +35,45 @@ MODELO = configurar()  # LLM REAL: PROVEDOR no .env (openai ou ollama)
 #   Referência: exercicios_resolvidos/aula4/ex10_function_tool.py (consultar_protocolo)
 @function_tool
 def consultar_servidor(matricula: str) -> str:
-    """TODO: escreva a docstring (o que a tool faz e o que é o argumento)."""
-    raise NotImplementedError("ETAPA 1.1: consultar_servidor")
+    """Consulta os dados cadastrais e funcionais de um servidor público pelo número da matrícula.
+
+    Retorna informações como nome, cargo, equipe, saldo de férias e abonos restantes em formato JSON.
+    Se a matrícula não existir, retorna mensagem informando que não foi encontrada.
+
+    Args:
+        matricula: A matrícula funcional do servidor (ex.: '1001', '1002').
+    """
+    print("[tool] consultar_servidor", matricula)
+    return json.dumps(servidor_publico(matricula), ensure_ascii=False)
 
 
 def criar_atendente() -> Agent:
-    # ETAPA 1.2 -- o agente
-    #   Agent(name="AtendenteRH", instructions=..., tools=[consultar_servidor])
-    #   Instruções: atende servidores, responde em português e de forma breve, usa a tool quando a pergunta
-    #   for sobre os dados de UM servidor, e não inventa saldo de cabeça.
-    #   Referência: aula1/segundo_agente.py
-    raise NotImplementedError("ETAPA 1.2: criar_atendente")
+    return Agent(
+        name="AtendenteRH",
+        instructions=(
+            "Você é o Atendente de Recursos Humanos (RH). "
+            "Responda às dúvidas dos servidores públicos em português e de forma breve e educada. "
+            "Quando a pergunta for sobre dados cadastrais ou funcionais de um servidor específico "
+            "(como saldo de férias, abonos, cargo ou equipe), utilize a ferramenta consultar_servidor "
+            "informando a matrícula do servidor. "
+            "Nunca invente saldos ou dados de cabeça; baseie-se estritamente nas informações da ferramenta. "
+            "Para dúvidas conceituais, gerais ou sobre normas de RH (como explicar o que é abono pecuniário), "
+            "responda diretamente de forma clara sem chamar nenhuma ferramenta."
+        ),
+        tools=[consultar_servidor],
+    )
 
 
 def main() -> None:
-    # ETAPA 1.3 -- rode as duas perguntas com Runner.run_sync e imprima resultado.final_output
-    #   1) "Quantos dias de férias a matrícula 1002 ainda tem?"   (precisa da tool)
-    #   2) "O que é abono pecuniário?"                            (não precisa)
-    #   Referência: aula8/exemplos/02_agente_tool/main.py
-    raise NotImplementedError("ETAPA 1.3: main")
+    atendente = criar_atendente()
+
+    pergunta1 = "Quantos dias de férias a matrícula 1002 ainda tem?"
+    resultado1 = Runner.run_sync(atendente, pergunta1)
+    print(resultado1.final_output)
+
+    pergunta2 = "O que é abono pecuniário?"
+    resultado2 = Runner.run_sync(atendente, pergunta2)
+    print(resultado2.final_output)
 
 
 if __name__ == "__main__":

@@ -39,35 +39,111 @@ MODELO = configurar()
 
 
 def analisar(pedido: dict, servidor: dict, periodo: dict, violacoes: list[str], hooks: RunHooks | None = None) -> str:
-    # ETAPA 6.3 -- monte um texto com o pedido, o servidor (matrícula e equipe), o período e as violações objetivas,
-    #   e rode criar_coordenador(hooks) com rodar_com_limites_sync(..., hooks=hooks). Devolva final_output.
-    raise NotImplementedError("ETAPA 6.3: analisar")
+    coordenador = agentes.criar_coordenador(hooks=hooks)
+    contexto = (
+        f"Pedido recebido:\n{json.dumps(pedido, ensure_ascii=False, indent=2)}\n\n"
+        f"Dados do servidor:\nMatrícula: {servidor.get('matricula')}, Nome: {servidor.get('nome')}, "
+        f"Equipe: {servidor.get('equipe')}, Cargo: {servidor.get('cargo')}, Saldo Férias: {servidor.get('saldo_ferias_dias')}, "
+        f"Abonos Restantes: {servidor.get('abonos_restantes')}\n\n"
+        f"Resumo do período solicitado:\n{json.dumps(periodo, ensure_ascii=False, indent=2)}\n\n"
+        f"Violações objetivas identificadas previamente:\n"
+        + ("\n".join(f"- {v}" for v in violacoes) if violacoes else "Nenhuma violação objetiva encontrada.")
+        + "\n\nPor favor, consulte os especialistas pertinentes e emita seu parecer consolidado."
+    )
+    resultado = rodar_com_limites_sync(coordenador, contexto, hooks=hooks)
+    return resultado.final_output
 
 
 def processar(texto: str, hooks: RunHooks | None = None) -> dict:
-    # ETAPA 6.4 -- encadeie, imprimindo cada passo ("[1/9] guardrails", ...):
-    #   1. encontrar_dado_sensivel / nota_escopo >= LIMIAR  -> devolva {"resultado": "bloqueado", "mensagem": ...}
-    #   2. pedido = extrair(texto).model_dump(mode="json")  -> sem matrícula ou datas: {"resultado": "pedir_dados"}
-    #   3. servidor = chamar_mcp("consultar_servidor", ...) -> não encontrado: {"resultado": "pedir_dados"}
-    #   4. periodo = resumo_periodo(...)                     (API de feriados, Etapa 4)
-    #   5. escala = chamar_mcp("consultar_escala", ...); violacoes = violacoes_objetivas(...)
-    #   6. parecer = analisar(...)
-    #   7. despacho = rodar_com_limites_sync(agentes.criar_redator(), <fatos + parecer + violações>).final_output
-    #   8. protocolo = gerar_protocolo(...)
-    #   9. chamar_mcp("registrar_decisao", {..., "decisao": "indeferido" se houver violação senão "deferido",
-    #        "aprovador": "pendente_chefia" se precisa_chefia(...) senão "sistema", "token": os.getenv("TOKEN_REGISTRO")})
-    #      (a aprovação de verdade da chefia entra na Etapa 8; aqui só marcamos que ela será necessária)
-    #   Devolva {"resultado": ..., "protocolo": ..., "despacho": ..., "parecer": ...}.
-    raise NotImplementedError("ETAPA 6.4: processar")
+    print("\n[1/9] guardrails de entrada...")
+    dado_sensivel = encontrar_dado_sensivel(texto)
+    if dado_sensivel:
+        return {"resultado": "bloqueado", "mensagem": MENSAGENS["dado_sensivel"]}
+    nota, _ = nota_escopo(texto)
+    if nota >= LIMIAR:
+        return {"resultado": "bloqueado", "mensagem": MENSAGENS["fora_do_escopo"]}
+
+    print("[2/9] extração estruturada...")
+    pedido_obj = extrair(texto)
+    pedido = pedido_obj.model_dump(mode="json")
+    if not pedido.get("matricula") or not pedido.get("data_inicio") or not pedido.get("data_fim"):
+        return {"resultado": "pedir_dados", "mensagem": "Matrícula ou datas não informadas no pedido."}
+
+    print(f"[3/9] consultar servidor ({pedido['matricula']}) via MCP...")
+    servidor = chamar_mcp("consultar_servidor", {"matricula": pedido["matricula"]})
+    if not servidor or servidor.get("erro"):
+        return {"resultado": "pedir_dados", "mensagem": f"Servidor não encontrado para a matrícula {pedido['matricula']}."}
+
+    print("[4/9] resumo do período e feriados...")
+    periodo = resumo_periodo(pedido["data_inicio"], pedido["data_fim"])
+
+    print(f"[5/9] consultar escala ({servidor.get('equipe')}) e regras objetivas...")
+    escala = chamar_mcp("consultar_escala", {
+        "equipe": servidor.get("equipe", ""),
+        "inicio": pedido["data_inicio"],
+        "fim": pedido["data_fim"]
+    })
+    violacoes = violacoes_objetivas(pedido, servidor, periodo, escala)
+
+    print("[6/9] análise técnica do coordenador com especialistas...")
+    parecer = analisar(pedido, servidor, periodo, violacoes, hooks=hooks)
+
+    print("[7/9] redação do despacho oficial...")
+    prompt_redator = (
+        f"Elabore o despacho administrativo com base nas seguintes informações:\n"
+        f"- Pedido: {json.dumps(pedido, ensure_ascii=False)}\n"
+        f"- Servidor: Matrícula {servidor.get('matricula')}, Nome {servidor.get('nome')}, Equipe {servidor.get('equipe')}\n"
+        f"- Período: de {pedido['data_inicio']} a {pedido['data_fim']} (retorno: {periodo.get('retorno')})\n"
+        f"- Decisão baseada nas regras: {'INDEFERIDO' if violacoes else 'DEFERIDO'}\n"
+        f"- Violações objetivas: {violacoes if violacoes else 'Nenhuma'}\n"
+        f"- Parecer dos especialistas:\n{parecer}\n"
+    )
+    despacho = rodar_com_limites_sync(agentes.criar_redator(), prompt_redator, hooks=hooks).final_output
+
+    print("[8/9] geração de protocolo...")
+    protocolo = gerar_protocolo(pedido["matricula"], pedido["tipo"], pedido["data_inicio"], pedido["data_fim"])
+
+    print(f"[9/9] registro de decisão no MCP (protocolo {protocolo})...")
+    decisao = "indeferido" if violacoes else "deferido"
+    aprovador = "pendente_chefia" if precisa_chefia(pedido, violacoes) else "sistema"
+
+    chamar_mcp("registrar_decisao", {
+        "protocolo": protocolo,
+        "matricula": pedido["matricula"],
+        "tipo": pedido["tipo"],
+        "inicio": pedido["data_inicio"],
+        "fim": pedido["data_fim"],
+        "decisao": decisao,
+        "aprovador": aprovador,
+        "despacho": despacho,
+        "token": os.getenv("TOKEN_REGISTRO", ""),
+    })
+
+    return {
+        "resultado": decisao,
+        "protocolo": protocolo,
+        "despacho": despacho,
+        "parecer": parecer,
+        "violacoes": violacoes,
+        "aprovador": aprovador,
+    }
 
 
 def testar_governanca() -> None:
-    # 🆕 B.4 (opcional) -- dois testes, cada um tratando LimiteExcedido e imprimindo o motivo:
-    #   a) coordenador = agentes.criar_coordenador(hooks=Governanca(), tools_extras=[agentes.consultar_remuneracao])
-    #      pergunte "Qual o salário da matrícula 1002?" -> deve ser BARRADO e o print da tool NÃO pode aparecer.
-    #   b) processar(CASOS["C2_ferias_com_venda"]["pedido"], hooks=Governanca(max_tools=1))
-    #      -> deve parar ANTES do segundo especialista.
-    raise NotImplementedError("🆕 B.4: testar_governanca")
+    print("\n--- Teste A: Coordenador tentando acessar tool restrita (consultar_remuneracao) ---")
+    try:
+        coordenador = agentes.criar_coordenador(hooks=Governanca(), tools_extras=[agentes.consultar_remuneracao])
+        rodar_com_limites_sync(coordenador, "Qual o salário da matrícula 1002?", hooks=Governanca())
+        print("FALHA: Deveria ter sido bloqueado!")
+    except LimiteExcedido as e:
+        print(f"[OK] Bloqueado com sucesso por Governança: {e}")
+
+    print("\n--- Teste B: C2 com limite de ferramentas estourado (max_tools=1) ---")
+    try:
+        processar(CASOS["C2_ferias_com_venda"]["pedido"], hooks=Governanca(max_tools=1))
+        print("FALHA: Deveria ter sido bloqueado por limite de tools!")
+    except LimiteExcedido as e:
+        print(f"[OK] Bloqueado com sucesso antes do segundo especialista: {e}")
 
 
 if __name__ == "__main__":

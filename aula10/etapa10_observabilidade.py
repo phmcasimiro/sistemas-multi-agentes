@@ -27,13 +27,30 @@ ARQUIVO_METRICAS = SAIDAS / "metricas.jsonl"
 
 
 def medido(nome: str, no):
-    # ETAPA 10.2 -- devolva uma função que:
-    #   1. mede o tempo de no(estado) com time.perf_counter();
-    #   2. grava em ARQUIVO_METRICAS uma linha JSON com: thread_id (estado.get("thread_id")), no, segundos,
-    #      e, se o nó devolveu, "tokens" e "fonte_feriados";
-    #   3. devolve o MESMO dicionário que o nó devolveu.
-    #   Use @functools.wraps(no) para o nome do nó continuar o mesmo.
-    return no  # pass-through: troque pelo wrapper
+    @functools.wraps(no)
+    def wrapper(estado: dict) -> dict:
+        inicio = time.perf_counter()
+        resultado = no(estado)
+        duracao = round(time.perf_counter() - inicio, 4)
+
+        ARQUIVO_METRICAS.parent.mkdir(parents=True, exist_ok=True)
+        linha = {
+            "thread_id": estado.get("thread_id"),
+            "no": nome,
+            "segundos": duracao,
+        }
+        if isinstance(resultado, dict):
+            if "tokens" in resultado:
+                linha["tokens"] = resultado["tokens"]
+            if "fonte_feriados" in resultado:
+                linha["fonte_feriados"] = resultado["fonte_feriados"]
+
+        with open(ARQUIVO_METRICAS, "a", encoding="utf-8") as f:
+            f.write(json.dumps(linha, ensure_ascii=False) + "\n")
+
+        return resultado
+
+    return wrapper
 
 
 def resumo(thread_id: str) -> dict:
