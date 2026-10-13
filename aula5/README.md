@@ -64,7 +64,7 @@ Server não tem esse hook:
 
 ```bash
 docker cp banco-sqlserver/init.sql cisp-mssql:/tmp/init.sql
-docker exec cisp-mssql /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'YourStrong@Password123' -C -i /tmp/init.sql
+docker exec cisp-mssql /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$MSSQL_PASSWORD" -C -i /tmp/init.sql
 ```
 
 Rodar antes do seed do SQL Server — sem o schema, o erro é `Login failed for
@@ -92,10 +92,10 @@ Conexão via `settings.json` (Ctrl+Shift+P → Preferences: Open User Settings J
 "sqltools.connections": [
   { "name": "CISP Ocorrências", "driver": "PostgreSQL", "server": "127.0.0.1",
     "port": 5434, "database": "cisp_ocorrencias", "username": "postgres",
-    "password": "Postgres@12345" },
+    "password": "${PG_PASSWORD}" },
   { "name": "CISP Operações", "driver": "MSSQL", "server": "127.0.0.1",
     "port": 1433, "database": "cisp_operacoes", "username": "sa",
-    "password": "YourStrong@Password123",
+    "password": "${MSSQL_PASSWORD}",
     "mssqlOptions": { "encrypt": true, "trustServerCertificate": true } }
 ]
 ```
